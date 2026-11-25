@@ -211,6 +211,12 @@ legend { font-family: var(--display); font-weight: 700; letter-spacing: .1em; te
 .confirm { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 40; display: grid; place-items: end center; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 .confirm .sheet { width: 100%; max-width: 448px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: grid; gap: 12px; }
 .confirm h3 { margin: 0; font-family: var(--display); font-size: 22px; text-transform: uppercase; }
+.share-view { position: fixed; inset: 0; z-index: 45; background: rgba(0,0,0,.88); display: grid; grid-template-rows: auto 1fr auto; gap: 12px; padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.share-view .sv-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; max-width: 448px; width: 100%; margin: 0 auto; }
+.share-view .sv-h b { font-family: var(--display); font-size: 20px; text-transform: uppercase; letter-spacing: .04em; }
+.share-view .sv-img { min-height: 0; display: grid; place-items: center; }
+.share-view .sv-img img { max-height: 100%; max-width: 100%; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.6); -webkit-touch-callout: default; }
+.share-view .sv-actions { display: grid; gap: 8px; max-width: 448px; width: 100%; margin: 0 auto; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; z-index: 50; }
 .footer-note { text-align: center; color: var(--muted); font-size: 12px; padding-block: 24px 8px; }
 .footer-note button { background: none; border: 0; color: var(--muted); text-decoration: underline; font-size: 12px; }
@@ -614,6 +620,7 @@ function renderReport(x) {
     </div>
     ${x.photos.length ? `<div class="panel"><div class="section-h" style="margin-top:0">Photos</div><div class="photos">${x.photos.map((p) => `<div class="ph"><img src="${p}" alt=""></div>`).join("")}</div></div>` : ""}
     <div class="panel"><div class="section-h" style="margin-top:0">Mark as</div><div class="chips" style="flex-wrap:wrap">${STATUSES.map((st) => `<button class="chip" data-act="status" data-s="${st}" aria-pressed="${x.status === st}">${st}</button>`).join("")}</div></div>
+    <button class="btn btn-primary btn-block" data-act="share">Share report</button>
     <button class="btn btn-danger btn-block" data-act="delete">Delete this inspection</button>
   </div>`;
 }
@@ -723,6 +730,106 @@ function compress(file) {
     r.onerror = rej; r.readAsDataURL(file);
   });
 }
+/* ---------- Shareable report image ---------- */
+const imgCache = {};
+const loadImg = (src) => imgCache[src] ||= new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+function wrapLines(ctx, text, maxW, maxLines) {
+  const words = String(text).split(/\s+/); const lines = []; let line = "";
+  for (const w of words) { const test = line ? line + " " + w : w; if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test; }
+  if (line) lines.push(line);
+  if (lines.length > maxLines) { lines.length = maxLines; lines[maxLines - 1] = lines[maxLines - 1].replace(/\s*\S*$/, "") + "…"; }
+  return lines;
+}
+async function reportImage(x) {
+  try { await document.fonts.ready; } catch (e) {}
+  const s = scoreOf(x);
+  const W = 1080, H = 1350, P = 64;
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  const D = '"Saira Condensed", "Arial Narrow", Impact, sans-serif', B = '"Barlow", system-ui, sans-serif';
+  const COL = { send: ["#57b85a", "#0b1a0b"], neg: ["#f2b632", "#261b02"], walk: ["#e5452f", "#ffffff"], none: ["#25221c", "#f2ede3"] };
+  g.fillStyle = "#0f0e0c"; g.fillRect(0, 0, W, H);
+  // header
+  const logo = await loadImg(LOGO);
+  if (logo) { g.save(); g.beginPath(); g.roundRect(P, P, 150, 150, 18); g.clip(); g.drawImage(logo, P, P, 150, 150); g.restore(); }
+  g.fillStyle = "#c9a46a"; g.font = `700 30px ${D}`; g.fillText("USED DIRT BIKE INSPECTION REPORT", P + 180, P + 42);
+  g.fillStyle = "#f2ede3"; g.font = `800 64px ${D}`;
+  const title = bikeName(x).toUpperCase(); let ts = 64; while (g.measureText(title).width > W - P * 2 - 180 && ts > 36) { ts -= 2; g.font = `800 ${ts}px ${D}`; }
+  g.fillText(title, P + 180, P + 108);
+  g.fillStyle = "#a69d8b"; g.font = `500 30px ${B}`;
+  g.fillText([x.type ? TYPES[x.type].label : "", x.hours ? x.hours + " hrs/mi" : "", x.vin ? "VIN …" + x.vin.slice(-6) : ""].filter(Boolean).join("  ·  "), P + 180, P + 150);
+  // verdict
+  let y = P + 200; const [vb, vf] = COL[s.v];
+  g.fillStyle = vb; g.beginPath(); g.roundRect(P, y, W - P * 2, 230, 28); g.fill();
+  g.fillStyle = vf; g.font = `800 104px ${D}`; g.fillText((s.v === "send" ? "SEND IT!" : s.label.toUpperCase()), P + 40, y + 120);
+  g.font = `600 32px ${B}`;
+  const sub = s.red.length ? `${s.red.length} dealbreaker${s.red.length > 1 ? "s" : ""} found` : `${s.good} good · ${s.issue} issues · ${s.skip} skipped`;
+  g.fillText(sub, P + 44, y + 182);
+  if (s.pct !== null) { g.textAlign = "right"; g.font = `800 120px ${D}`; g.fillText(s.pct + "%", W - P - 40, y + 130); g.font = `700 26px ${D}`; g.fillText("CHECKS GOOD", W - P - 44, y + 180); g.textAlign = "left"; }
+  // prices
+  y += 270; const cw = (W - P * 2 - 40) / 3;
+  [["ASKING", money(x.asking), "#f2ede3"], ["LOWEST OFFERED", money(x.lowest), "#57b85a"], ["CHECKED", `${s.answered}/${s.total}`, "#f2ede3"]].forEach(([l, v, col], i) => {
+    const cx = P + i * (cw + 20);
+    g.fillStyle = "#1b1915"; g.strokeStyle = "#3a3529"; g.lineWidth = 2; g.beginPath(); g.roundRect(cx, y, cw, 140, 20); g.fill(); g.stroke();
+    g.fillStyle = col; g.font = `800 58px ${D}`; g.textAlign = "center"; g.fillText(v, cx + cw / 2, y + 74);
+    g.fillStyle = "#a69d8b"; g.font = `600 22px ${B}`; g.fillText(l, cx + cw / 2, y + 114); g.textAlign = "left";
+  });
+  // problems
+  y += 190;
+  g.fillStyle = "#c9a46a"; g.font = `700 34px ${D}`; g.fillText(s.red.length || s.issues.length ? "PROBLEMS FOUND" : "NO PROBLEMS FOUND", P, y);
+  y += 24;
+  const probs = [...s.red.map((k) => ({ k, red: true })), ...s.issues.map((k) => ({ k, red: false }))];
+  const maxY = H - 130; let shown = 0;
+  for (const { k, red } of probs) {
+    g.font = `500 26px ${B}`;
+    const note = wrapLines(g, x.checkNotes[k.id] || k.cat, W - P * 2 - 60, 1)[0];
+    const h = 96; if (y + h > maxY) break;
+    g.fillStyle = red ? "rgba(229,69,47,.14)" : "#1b1915"; g.strokeStyle = red ? "#6b2a20" : "#3a3529";
+    g.beginPath(); g.roundRect(P, y, W - P * 2, h - 12, 16); g.fill(); g.stroke();
+    g.fillStyle = red ? "#ff8a75" : "#f2ede3"; g.font = `700 32px ${B}`; g.fillText((red ? "⚠ " : "• ") + k.q, P + 28, y + 40);
+    g.fillStyle = "#a69d8b"; g.font = `500 26px ${B}`; g.fillText(note, P + 28 + (red ? 0 : 0), y + 72);
+    y += h; shown++;
+  }
+  if (shown < probs.length) { g.fillStyle = "#a69d8b"; g.font = `600 28px ${B}`; g.fillText(`+ ${probs.length - shown} more in the app`, P, y + 30); }
+  if (!probs.length && s.answered) { g.fillStyle = "#a69d8b"; g.font = `500 30px ${B}`; g.fillText(`Every checked item passed (${s.good} of ${s.total}).`, P, y + 30); }
+  // footer
+  g.fillStyle = "#3a3529"; g.fillRect(P, H - 100, W - P * 2, 2);
+  g.fillStyle = "#a69d8b"; g.font = `500 26px ${B}`;
+  g.fillText("Inspected " + new Date().toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }), P, H - 52);
+  g.textAlign = "right"; g.fillStyle = "#f08a1c"; g.font = `800 34px ${D}`; g.fillText("SEND IT! INSPECTOR", W - P, H - 50); g.textAlign = "left";
+  return c;
+}
+function reportText(x) {
+  const s = scoreOf(x);
+  const lines = [`${bikeName(x)} — ${s.v === "none" ? s.label : s.label.toUpperCase()}${s.pct !== null ? ` (${s.pct}% good)` : ""}`];
+  if (x.asking) lines.push(`Asking ${money(x.asking)}${x.lowest ? `, lowest offered ${money(x.lowest)}` : ""}`);
+  for (const k of s.red) lines.push(`⚠ ${k.q}${x.checkNotes[k.id] ? ": " + x.checkNotes[k.id] : ""}`);
+  for (const k of s.issues) lines.push(`• ${k.q}${x.checkNotes[k.id] ? ": " + x.checkNotes[k.id] : ""}`);
+  lines.push(`Checked ${s.answered}/${s.total} items with SEND IT! Inspector`);
+  return lines.join("\n");
+}
+async function shareReport(x) {
+  toast("Building report…");
+  const canvas = await reportImage(x);
+  const blob = await new Promise((r) => canvas.toBlob(r, "image/png"));
+  const name = bikeName(x).replace(/[^\w]+/g, "-") + "-inspection.png";
+  const file = blob ? new File([blob], name, { type: "image/png" }) : null;
+  const text = reportText(x);
+  if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: bikeName(x) + " inspection", text }); return; }
+    catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  const url = canvas.toDataURL("image/png");
+  const d = document.createElement("div"); d.className = "share-view";
+  d.innerHTML = `<div class="sv-h"><b>Your report</b><button class="btn btn-ghost" data-close>Close</button></div>
+    <div class="sv-img"><img src="${url}" alt="Inspection report for ${esc(bikeName(x))}"></div>
+    <div class="sv-actions"><div class="hint" style="text-align:center;font-size:14px">Press and hold the image to save or share it.</div><button class="btn btn-ghost btn-block" data-copy>Copy report as text</button></div>`;
+  d.addEventListener("click", (e) => {
+    if (e.target.closest("[data-close]")) d.remove();
+    else if (e.target.closest("[data-copy]")) navigator.clipboard?.writeText(text).then(() => toast("Report copied"), () => toast("Couldn't copy here. Save the image instead."));
+  });
+  document.body.appendChild(d); d.querySelector("[data-close]").focus();
+}
 function toast(msg) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 1800); }
 function confirmSheet(title, body, okLabel, onOk) {
   const d = document.createElement("div"); d.className = "confirm";
@@ -759,6 +866,7 @@ app.addEventListener("click", (e) => {
   }
   else if (act === "edit") { x._fromReport = true; go("details"); }
   else if (act === "status") { x.status = el.dataset.s; save(); render(); toast("Marked " + x.status); }
+  else if (act === "share") shareReport(x);
   else if (act === "delete") confirmSheet("Delete inspection?", `${bikeName(x)} and its checklist will be removed from this device.`, "Delete", () => { S.inspections = S.inspections.filter((i) => i.id !== x.id); save(); go("home"); toast("Deleted"); });
   else if (act === "reset") confirmSheet("Reset to sample data?", "This replaces everything saved on this device with the four example bikes.", "Reset", () => { S = seed(); save(); filter = "All"; render(); toast("Sample data restored"); });
   else if (act === "trust") { const k = el.dataset.k; const order = ["", "trusted", "caution", "flaky"]; const m = (S.sellers[k] ||= {}); m.trust = order[(order.indexOf(m.trust || "") + 1) % order.length]; save(); keepScroll(render); }
