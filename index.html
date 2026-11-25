@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f0e0c">
+<meta name="description" content="Inspect used dirt bikes before you buy: guided checklist, seller tracking and route planning.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SEND IT!">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>SEND IT! Inspector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one phone-width column, sticky screen header, fixed bottom tab bar. Dirt + steel palette pulled from the SEND IT! logo. Single dark look by design. */
+:root {
+  --bg: #0f0e0c;
+  --panel: #1b1915;
+  --panel-2: #25221c;
+  --line: #3a3529;
+  --fg: #f2ede3;
+  --muted: #a69d8b;
+  --orange: #f08a1c;
+  --dirt: #c9a46a;
+  --good: #57b85a;
+  --bad: #e5452f;
+  --warn: #f2b632;
+  --on-accent: #1a1209;
+  --display: "Saira Condensed", "Arial Narrow", Impact, sans-serif;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); -webkit-tap-highlight-color: transparent; }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.45; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+a { color: var(--orange); }
+#app { max-width: 480px; margin: 0 auto; min-height: 100%; padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); position: relative; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
+.top-in { display: flex; align-items: center; gap: 10px; padding-block: 12px; }
+.top h1 { font-family: var(--display); font-weight: 800; font-size: 22px; letter-spacing: .02em; text-transform: uppercase; margin: 0; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon-btn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; width: 38px; height: 38px; display: grid; place-items: center; flex: none; }
+.icon-btn svg { width: 18px; height: 18px; }
+
+/* home */
+.hero { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-block: 18px 8px; }
+.hero .logo { width: 100%; max-width: 270px; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.6); }
+.start-btn { background: none; border: 0; padding: 0; width: 100%; max-width: 330px; transition: transform .12s; }
+.start-btn img { width: 100%; display: block; filter: drop-shadow(0 6px 10px rgba(0,0,0,.6)); }
+.start-btn:active { transform: scale(.97); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-block: 14px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; }
+.stat b { display: block; font-family: var(--display); font-size: 28px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.section-h { font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: .1em; text-transform: uppercase; color: var(--dirt); margin: 20px 0 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.section-h small { font-family: var(--body); font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.next-appt { background: linear-gradient(135deg, #3a2410, var(--panel)); border: 1px solid #6b4317; border-radius: 14px; padding: 14px; display: flex; gap: 12px; align-items: center; }
+.next-appt .when { font-family: var(--display); font-size: 20px; font-weight: 700; color: var(--orange); line-height: 1.1; }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 6px 12px; font-size: 13px; white-space: nowrap; font-weight: 600; }
+.chip[aria-pressed="true"] { background: var(--orange); color: var(--on-accent); border-color: var(--orange); }
+
+.list { display: grid; gap: 10px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start; cursor: pointer; text-align: left; width: 100%; }
+.card:hover { border-color: #5a5242; }
+.card .body { min-width: 0; }
+.card .title { font-weight: 700; font-size: 16px; line-height: 1.2; }
+.card .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.card .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; font-size: 12px; }
+.mono { width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: 17px; letter-spacing: .02em; flex: none; border: 2px solid rgba(255,255,255,.12); }
+.tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
+.tag.type { color: var(--dirt); border-color: #5c4a2c; }
+.tag.s-Watching { color: #9fb7d8; }
+.tag.s-Scheduled { color: var(--orange); border-color: #6b4317; }
+.tag.s-Inspected { color: var(--fg); }
+.tag.s-Bought { color: var(--good); border-color: #2f5f31; }
+.tag.s-Passed { color: var(--muted); text-decoration: line-through; }
+.tag.sample { color: var(--muted); font-weight: 600; }
+.score { min-width: 54px; text-align: center; border-radius: 10px; padding: 6px 6px 5px; font-family: var(--display); line-height: 1; }
+.score b { font-size: 22px; font-weight: 800; display: block; font-variant-numeric: tabular-nums; }
+.score span { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; }
+.v-send { background: var(--good); color: #0b1a0b; }
+.v-neg { background: var(--warn); color: #261b02; }
+.v-walk { background: var(--bad); color: #fff; }
+.v-none { background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
+.link-sm { font-size: 12px; font-weight: 600; }
+.empty { border: 1px dashed var(--line); border-radius: 14px; padding: 22px; text-align: center; color: var(--muted); }
+
+/* forms */
+.form { display: grid; gap: 12px; padding-block: 14px; }
+fieldset { border: 1px solid var(--line); border-radius: 14px; padding: 12px 12px 14px; margin: 0; display: grid; gap: 12px; background: var(--panel); min-width: 0; }
+legend { font-family: var(--display); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--dirt); padding: 0 6px; font-size: 14px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.field input, .field select, .field textarea { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 11px; min-width: 0; }
+.field textarea { min-height: 70px; resize: vertical; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--orange); outline: none; }
+.hint { font-size: 12px; color: var(--muted); }
+.detect { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.detect strong { color: var(--orange); font-family: var(--display); font-size: 18px; letter-spacing: .03em; text-transform: uppercase; }
+.vin-out { font-size: 13px; padding: 8px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); }
+.vin-out.ok { border-color: #2f5f31; color: #bfe5c0; }
+.vin-out.bad { border-color: #6b2a20; color: #f3b3a8; }
+.mono-font { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .05em; }
+.photos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.photos .ph { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); max-width: 100%; }
+.photos img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photos .ph button { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: rgba(0,0,0,.7); color: #fff; font-size: 13px; line-height: 1; }
+.add-photo { aspect-ratio: 1; border: 1px dashed var(--line); border-radius: 8px; display: grid; place-items: center; color: var(--muted); font-size: 12px; text-align: center; cursor: pointer; }
+
+.btn { border: 0; border-radius: 12px; padding: 13px 16px; font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-primary { background: var(--orange); color: var(--on-accent); font-family: var(--display); font-size: 19px; letter-spacing: .06em; text-transform: uppercase; }
+.btn-ghost { background: var(--panel-2); border: 1px solid var(--line); }
+.btn-danger { background: transparent; border: 1px solid #6b2a20; color: #f3a497; }
+.btn-block { width: 100%; }
+.actions { display: grid; gap: 8px; padding-block: 6px 20px; }
+
+/* checklist */
+.prog { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 63px); z-index: 15; background: var(--bg); padding-block: 10px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+.bar { flex: 1; height: 8px; border-radius: 99px; background: var(--panel-2); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--orange); transition: width .25s; }
+.prog .txt { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cat { margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--panel); }
+.cat.special { border-color: #6b4317; }
+.cat-h { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px; background: var(--panel-2); border: 0; text-align: left; }
+.cat.special .cat-h { background: linear-gradient(90deg, #3a2410, var(--panel-2)); }
+.cat-h b { font-family: var(--display); font-size: 17px; letter-spacing: .05em; text-transform: uppercase; }
+.cat-h span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.check { padding: 12px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+.check .q { font-weight: 600; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.check .how { font-size: 13px; color: var(--muted); }
+.crit { font-size: 10px; font-weight: 800; letter-spacing: .08em; color: var(--bad); border: 1px solid #6b2a20; border-radius: 4px; padding: 1px 5px; text-transform: uppercase; }
+.grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.grade button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 8px 4px; font-weight: 700; font-size: 13px; color: var(--muted); }
+.grade button[aria-pressed="true"].g { background: var(--good); border-color: var(--good); color: #0b1a0b; }
+.grade button[aria-pressed="true"].i { background: var(--bad); border-color: var(--bad); color: #fff; }
+.grade button[aria-pressed="true"].s { background: var(--line); border-color: var(--line); color: var(--fg); }
+.check textarea { width: 100%; background: var(--bg); border: 1px solid #6b2a20; border-radius: 9px; padding: 8px 10px; min-height: 52px; font-size: 14px; }
+.check.is-issue { background: rgba(229,69,47,.06); }
+
+/* report */
+.verdict { margin-top: 14px; border-radius: 16px; padding: 18px 16px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.verdict .big { font-family: var(--display); font-weight: 800; font-size: 40px; line-height: .95; text-transform: uppercase; letter-spacing: .01em; }
+.verdict p { margin: 6px 0 0; font-size: 14px; font-weight: 500; }
+.verdict .pct { font-family: var(--display); font-weight: 800; font-size: 48px; line-height: 1; text-align: right; font-variant-numeric: tabular-nums; }
+.verdict .pct small { display: block; font-size: 12px; letter-spacing: .1em; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; text-align: right; font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
+.price-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.price-row div { background: var(--bg); border-radius: 10px; padding: 10px 4px; border: 1px solid var(--line); }
+.price-row b { display: block; font-family: var(--display); font-size: 22px; font-variant-numeric: tabular-nums; }
+.price-row span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.flag-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.flag-list li { padding: 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-size: 14px; }
+.flag-list li.red { border-color: #6b2a20; background: rgba(229,69,47,.08); }
+.flag-list li b { display: block; }
+.flag-list li span { color: var(--muted); font-size: 13px; }
+
+/* sellers */
+.seller { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 10px; }
+.seller-h { display: flex; gap: 12px; align-items: center; }
+.seller-h .nm { font-weight: 700; font-size: 17px; flex: 1; min-width: 0; }
+.avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--line); display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--dirt); flex: none; }
+.trust { border-radius: 999px; padding: 5px 11px; font-size: 12px; font-weight: 700; border: 1px solid var(--line); background: var(--bg); color: var(--muted); }
+.trust.t-trusted { color: var(--good); border-color: #2f5f31; }
+.trust.t-caution { color: var(--warn); border-color: #6b5317; }
+.trust.t-flaky { color: var(--bad); border-color: #6b2a20; }
+.contact { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; align-items: center; }
+.contact .num { user-select: all; font-variant-numeric: tabular-nums; }
+.copy { background: none; border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; font-size: 12px; color: var(--muted); }
+.bike-line { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 8px 10px; background: var(--bg); border-radius: 10px; border: 1px solid var(--line); font-size: 14px; cursor: pointer; width: 100%; text-align: left; }
+.bike-line .l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* route */
+.stop { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.stop.off { opacity: .5; }
+.stop .n { width: 28px; height: 28px; border-radius: 50%; background: var(--orange); color: var(--on-accent); display: grid; place-items: center; font-family: var(--display); font-weight: 800; }
+.stop.off .n { background: var(--panel-2); color: var(--muted); }
+.stop .body { min-width: 0; }
+.stop .addr { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.updn { display: grid; gap: 4px; }
+.updn button { width: 32px; height: 26px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel-2); font-size: 12px; }
+.toggle { appearance: none; width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--line); background: var(--bg); display: grid; place-items: center; margin: 0; }
+.toggle:checked { background: var(--orange); border-color: var(--orange); }
+.toggle:checked::after { content: "✓"; color: var(--on-accent); font-weight: 900; font-size: 14px; }
+
+/* tabs */
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: rgba(15,14,12,.96); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); backdrop-filter: blur(8px); }
+.tabs-in { max-width: 480px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); }
+.tabs button { background: none; border: 0; padding: 9px 4px 10px; display: grid; justify-items: center; gap: 3px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.tabs button svg { width: 22px; height: 22px; }
+.tabs button[aria-current="page"] { color: var(--orange); }
+
+.confirm { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 40; display: grid; place-items: end center; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+.confirm .sheet { width: 100%; max-width: 448px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: grid; gap: 12px; }
+.confirm h3 { margin: 0; font-family: var(--display); font-size: 22px; text-transform: uppercase; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; z-index: 50; }
+.footer-note { text-align: center; color: var(--muted); font-size: 12px; padding-block: 24px 8px; }
+.footer-note button { background: none; border: 0; color: var(--muted); text-decoration: underline; font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+
+<div id="app"></div>
+<nav class="tabs" aria-label="Main">
+  <div class="tabs-in">
+    <button data-tab="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="16" r="3.5"/><circle cx="18.5" cy="16" r="3.5"/><path d="M5.5 16 9 9h5l2 4h2.5M9 9 8 6h3M14 9l4.5 7"/></svg>Garage</button>
+    <button data-tab="sellers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c2 .7 3.2 2.5 3.5 5.2"/></svg>Sellers</button>
+    <button data-tab="route"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7H16"/></svg>Route</button>
+  </div>
+</nav>
+
+<script>
+const LOGO = "img/logo.jpg";
+const START_BTN = "img/start-button.webp";
+
+/* ---------- Checklist data: 7 base categories, 38 checks ---------- */
+const BASE = [
+  { id: "frame", name: "Frame & Chassis", checks: [
+    ["f1", "Frame welds and rails", "Look for cracks, re-welds or fresh paint at the steering head, footpeg mounts and rear frame rails.", true],
+    ["f2", "Subframe straight", "Sight down the bike from behind. Seat and fender should line up with the rear wheel.", false],
+    ["f3", "Steering head bearings", "Lift the front wheel and turn the bars lock to lock. Notchy or clicking means worn bearings.", false],
+    ["f4", "Swingarm and linkage play", "Lift the rear and rock the wheel side to side and up and down. Any clunk means bearings.", false],
+    ["f5", "Footpegs and mounts", "Pegs should spring back and mounts should not be bent or cracked.", false],
+    ["f6", "VIN stamp matches title", "Read the VIN on the steering head and compare with the title. Ground-off or restamped numbers are a dealbreaker.", true]] },
+  { id: "engine", name: "Engine", checks: [
+    ["e1", "Cold start", "Ask the seller not to warm it up. Feel the cylinder before starting. Hard cold starts hint at worn top end.", true],
+    ["e2", "Idle holds steady", "Should idle without hunting once warm. Surging can mean air leaks or a dirty carb.", false],
+    ["e3", "Exhaust smoke", "Blue smoke on a 4-stroke means oil burning. White steam that smells sweet means coolant.", true],
+    ["e4", "Knocks or rattles", "Listen for bottom-end knock, valve tick or a rattling cam chain.", true],
+    ["e5", "Oil level and condition", "Check the sight glass or dipstick. Milky oil means coolant contamination. Metal flakes are bad.", false],
+    ["e6", "Coolant clean", "Open the radiator cap cold. Oil film or bubbles point to a head gasket.", true],
+    ["e7", "Hours and top-end records", "Ask for the hour meter reading and when the piston was last replaced.", false]] },
+  { id: "clutch", name: "Clutch & Transmission", checks: [
+    ["c1", "Clutch engagement", "Rev it in 3rd and release. It should pull, not slip. Check the lever for consistent engagement.", false],
+    ["c2", "All gears shift", "Run up and down every gear on a short ride or on the stand.", false],
+    ["c3", "Jumps out of gear", "Popping out under load or false neutrals point to worn shift forks or dogs.", true],
+    ["c4", "Countershaft seal", "Look behind the front sprocket for oil leaking.", false],
+    ["c5", "Clutch lever and cable", "Smooth pull with a little free play. Frayed cable or sticky hydraulics noted.", false]] },
+  { id: "susp", name: "Suspension", checks: [
+    ["s1", "Fork seals dry", "Wipe the fork tubes and compress the forks a few times. Oil rings mean leaking seals.", false],
+    ["s2", "Fork tubes smooth", "Check for pitting, scratches or rust on the chromed sections.", false],
+    ["s3", "Shock leak and rebound", "Shock body dry, rebound smooth without bouncing back too fast.", false],
+    ["s4", "Bearing and bushing play", "Grab the rear and lift. Excess play means linkage or shock bearings.", false],
+    ["s5", "Sag and setup", "Ask about rider weight and spring rates. Way off sag adds cost.", false]] },
+  { id: "wheels", name: "Wheels & Tires", checks: [
+    ["w1", "Rims true and undented", "Spin each wheel and watch the rim. Flat spots or dents from hard hits.", false],
+    ["w2", "Spokes tight", "Tap each spoke with a wrench. Loose ones go dull.", false],
+    ["w3", "Wheel bearings", "Rock the wheel on its axle. Any play or grinding when spun.", false],
+    ["w4", "Tire wear", "Knob height and cracking. Budget new tires if knobs are rounded.", false],
+    ["w5", "Sprockets", "Hooked or shark-fin teeth mean the chain and sprockets are due.", false]] },
+  { id: "brakes", name: "Brakes & Drivetrain", checks: [
+    ["b1", "Front brake", "Firm lever, no pulsing. Pads with life left.", false],
+    ["b2", "Rear brake", "Firm pedal that returns. Check pad thickness.", false],
+    ["b3", "Rotors", "Not warped, gouged or below minimum thickness.", false],
+    ["b4", "Chain stretch", "Pull the chain off the back of the rear sprocket. More than half a tooth showing is worn.", false],
+    ["b5", "Chain guide and slider", "Slider not worn through, guide not bent.", false]] },
+  { id: "papers", name: "Controls & Paperwork", checks: [
+    ["p1", "Throttle snaps back", "Twist and release at full lock both directions. It should snap closed every time.", false],
+    ["p2", "Kill switch works", "Engine shuts off cleanly.", false],
+    ["p3", "Bars and levers", "Bent bars or snapped levers show crash history.", false],
+    ["p4", "Title in seller's name", "No title, or a title in someone else's name, means walk unless you can verify the chain of ownership.", true],
+    ["p5", "Maintenance records", "Receipts, oil change log, rebuild invoices.", false]] }
+];
+
+const TYPES = {
+  mx:     { label: "Motocross", short: "MX" },
+  trail:  { label: "Trail bike", short: "Trail" },
+  dual:   { label: "Dual-sport", short: "Dual-sport" },
+  enduro: { label: "Enduro", short: "Enduro" }
+};
+
+const SPECIAL = {
+  mx: { id: "x-mx", name: "Motocross checks", checks: [
+    ["xm1", "Hard-landing damage", "Look under the frame for flattened or scraped lower rails and bent triple clamps.", true],
+    ["xm2", "Radiators straight", "Bent fins or epoxied leaks from crashes.", false],
+    ["xm3", "Piston hours", "Race bikes need a top end every 40 to 80 hours. Ask for the last one.", false],
+    ["xm4", "Race-worn plastics and guards", "Frame guards worn through, boot marks on the frame.", false],
+    ["xm5", "Aftermarket parts", "Note the pipe, holeshot device and any suspension work. Ask if stock parts come with it.", false]] },
+  trail: { id: "x-trail", name: "Trail bike checks", checks: [
+    ["xt1", "Low-speed idle", "Should creep along at idle without stalling.", false],
+    ["xt2", "Skid plate and case guards", "Dents in the skid plate or cracked engine cases from rocks.", true],
+    ["xt3", "Kickstand and lights", "Kickstand holds the bike up, lights work if fitted.", false],
+    ["xt4", "Clutch fade when hot", "After 10 minutes of riding the clutch should not drag.", false]] },
+  dual: { id: "x-dual", name: "Dual-sport checks", checks: [
+    ["xd1", "Street title and registration", "Plate and registration current, title is a street title.", true],
+    ["xd2", "DOT tires", "Tires must be DOT-rated to be street legal.", false],
+    ["xd3", "Lights, signals, horn, mirrors", "Test every one.", false],
+    ["xd4", "Battery and charging", "Starter spins strong. Voltage near 14 V at 3,000 rpm.", false],
+    ["xd5", "Odometer matches story", "Compare miles with the seller's description and tire wear.", false]] },
+  enduro: { id: "x-enduro", name: "Enduro checks", checks: [
+    ["xe1", "Radiator guards and fan", "Guards in place, cooling fan kicks on when hot.", false],
+    ["xe2", "Water in the airbox", "Pull the seat and look for water lines or mud past the filter.", true],
+    ["xe3", "Skid plate dents", "Rock strikes and cracked cases.", false],
+    ["xe4", "Hand guards and levers", "Bent guards mean the bike has been down a lot.", false],
+    ["xe5", "Hour meter or trip computer", "Works and matches the claimed hours.", false]] }
+};
+
+/* ---------- Make/model classification ---------- */
+const MAKES = ["Honda", "Yamaha", "Kawasaki", "Suzuki", "KTM", "Husqvarna", "GasGas", "Beta", "Other"];
+const RULES = {
+  Honda: [[/^CRF\d+RL/, "dual"], [/^CRF\d+L/, "dual"], [/^CRF\d+(RX|X)/, "enduro"], [/^CRF\d+R/, "mx"], [/^CRF\d+F/, "trail"], [/^XR\d+L/, "dual"], [/^XR/, "trail"]],
+  Yamaha: [[/^WR\d+R$/, "dual"], [/^YZ\d+F?X/, "enduro"], [/^WR/, "enduro"], [/^YZ/, "mx"], [/^TTR/, "trail"], [/^(XT|TW)/, "dual"]],
+  Kawasaki: [[/^KX\d+X/, "enduro"], [/^KX/, "mx"], [/^KLX\d+R/, "trail"], [/^KLX/, "dual"], [/^KLR/, "dual"]],
+  Suzuki: [[/^RMZ/, "mx"], [/^RMX/, "enduro"], [/^DRZ\d+S/, "dual"], [/^DR\d+/, "dual"], [/^DRZ/, "trail"], [/^RM/, "mx"]],
+  KTM: [[/EXC/, "dual"], [/XCW|XCFW/, "enduro"], [/XC/, "enduro"], [/SX/, "mx"]],
+  Husqvarna: [[/^(FE|TE)\d+S/, "dual"], [/^(FE|TE|FX|TX)/, "enduro"], [/^(FC|TC)/, "mx"], [/^(701|FS)/, "dual"]],
+  GasGas: [[/^MC/, "mx"], [/^ES/, "dual"], [/^(EC|EX)/, "enduro"]],
+  Beta: [[/RRS|RR-S/, "dual"], [/XTRAINER/, "enduro"], [/RX/, "mx"], [/RR/, "enduro"]]
+};
+function classify(make, model) {
+  const m = (model || "").toUpperCase().replace(/[\s\-\/]/g, "");
+  const r = RULES[make];
+  if (!m || !r) return null;
+  for (const [re, t] of r) if (re.test(m)) return t;
+  return null;
+}
+
+/* ---------- VIN decode (offline) ---------- */
+const WMI = { JH2: "Honda", JYA: "Yamaha", JKA: "Kawasaki", JKB: "Kawasaki", JS1: "Suzuki", VBK: "KTM group (KTM, Husqvarna, GasGas)", "1HF": "Honda (USA)", "5KT": "Kawasaki (USA)" };
+const YEAR = "ABCDEFGHJKLMNPRSTVWXY";
+function decodeVin(v) {
+  v = (v || "").toUpperCase().replace(/\s/g, "");
+  if (!v) return null;
+  if (v.length !== 17) return { ok: false, msg: `${v.length} of 17 characters` };
+  if (/[IOQ]/.test(v)) return { ok: false, msg: "VINs never contain I, O or Q. Recheck the stamp." };
+  const maker = WMI[v.slice(0, 3)] || `Unknown maker code ${v.slice(0, 3)}`;
+  const c = v[9]; let year = null;
+  const yi = YEAR.indexOf(c);
+  if (yi >= 0) year = 2010 + yi; else if (/[1-9]/.test(c)) year = 2000 + Number(c);
+  return { ok: true, maker, year, msg: `${maker}${year ? ` · model year ${year}` : ""}` };
+}
+
+/* ---------- Brand monograms (no trademarks, just letters + colors) ---------- */
+const MONO = {
+  Honda: ["HO", "#c8201e", "#fff"], Yamaha: ["YA", "#1f4fb4", "#fff"], Kawasaki: ["KA", "#5db22f", "#0d1a05"],
+  Suzuki: ["SU", "#f4c613", "#1b1602"], KTM: ["KT", "#f26b0f", "#1a0c02"], Husqvarna: ["HQ", "#e9ecef", "#16305e"],
+  GasGas: ["GG", "#d3262b", "#fff"], Beta: ["BE", "#2852a8", "#f2f2f2"], Other: ["??", "#3a3529", "#f2ede3"]
+};
+const mono = (make) => { const [t, bg, fg] = MONO[make] || MONO.Other; return `<div class="mono" style="background:${bg};color:${fg}" aria-hidden="true">${t}</div>`; };
+
+/* ---------- Helpers ---------- */
+const STATUSES = ["Watching", "Scheduled", "Inspected", "Bought", "Passed"];
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (n) => (n || n === 0) && n !== "" ? "$" + Number(n).toLocaleString("en-US") : "–";
+const uid = () => Math.random().toString(36).slice(2, 9);
+const normUrl = (u) => !u ? "" : (/^https?:\/\//i.test(u) ? u : "https://" + u);
+const mapsDir = (a) => "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(a);
+const bikeName = (x) => [x.year, x.make !== "Other" ? x.make : "", x.model].filter(Boolean).join(" ") || "Untitled bike";
+const sellerKey = (n) => (n || "").trim().toLowerCase();
+function fmtWhen(s) {
+  if (!s) return "";
+  const d = new Date(s); if (isNaN(d)) return "";
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const day = new Date(d); day.setHours(0, 0, 0, 0);
+  const diff = Math.round((day - today) / 864e5);
+  const t = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (diff === 0) return `Today ${t}`;
+  if (diff === 1) return `Tomorrow ${t}`;
+  if (diff === -1) return `Yesterday ${t}`;
+  return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) + " " + t;
+}
+function localDT(daysAhead, h, m) { const d = new Date(); d.setDate(d.getDate() + daysAhead); d.setHours(h, m, 0, 0); const p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(h)}:${p(m)}`; }
+
+function categoriesFor(x) { return x.type && SPECIAL[x.type] ? [...BASE, SPECIAL[x.type]] : BASE; }
+function allChecks(x) { return categoriesFor(x).flatMap((c) => c.checks.map(([id, q, how, crit]) => ({ id, q, how, crit, cat: c.name }))); }
+function scoreOf(x) {
+  const checks = allChecks(x);
+  let good = 0, issue = 0, skip = 0; const red = [], issues = [];
+  for (const c of checks) {
+    const g = x.checks[c.id];
+    if (g === "good") good++;
+    else if (g === "issue") { issue++; (c.crit ? red : issues).push(c); }
+    else if (g === "skip") skip++;
+  }
+  const answered = good + issue + skip, total = checks.length;
+  const pct = good + issue ? Math.round((good / (good + issue)) * 100) : null;
+  let v = "none", label = "Not started";
+  if (answered > 0) label = "In progress";
+  if (red.length) { v = "walk"; label = "Walk away"; }
+  else if (answered >= total * 0.5 && pct !== null) {
+    if (pct >= 85) { v = "send"; label = "Send it"; } else if (pct >= 65) { v = "neg"; label = "Negotiate"; } else { v = "walk"; label = "Walk away"; }
+  }
+  return { good, issue, skip, answered, total, pct, red, issues, v, label };
+}
+function scoreBadge(x) {
+  const s = scoreOf(x);
+  if (s.v === "none") return `<div class="score v-none"><b>${s.answered ? Math.round((s.answered / s.total) * 100) + "%" : "–"}</b><span>${s.answered ? "done" : "new"}</span></div>`;
+  return `<div class="score v-${s.v}"><b>${s.red.length ? "!" : s.pct}</b><span>${s.label}</span></div>`;
+}
+
+/* ---------- State & storage ---------- */
+const KEY = "sendit-inspector-v1";
+function seed() {
+  const all = (ids, val) => Object.fromEntries(ids.map((i) => [i, val]));
+  const baseIds = BASE.flatMap((c) => c.checks.map((k) => k[0]));
+  const yz = { ...all(baseIds, "good"), s1: "issue", w4: "issue", b4: "issue", p5: "skip", xm1: "good", xm2: "good", xm3: "issue", xm4: "good", xm5: "good" };
+  const ktm = { ...all(baseIds.slice(0, 20), "good"), e6: "issue", e3: "issue", f4: "issue" };
+  return {
+    inspections: [
+      { id: uid(), sample: true, make: "Yamaha", model: "YZ250F", year: "2019", type: "mx", vin: "JYACG31C9KA012345", hours: "62", sellerName: "Jake R.", sellerPhone: "(208) 555-0147", sellerAddress: "Eagle, ID", listingUrl: "facebook.com/marketplace", asking: 5200, lowest: 4700, notes: "Fork seals weeping. Chain and sprockets due. He'll throw in the stock pipe.", appt: localDT(-3, 17, 30), status: "Inspected", checks: yz, checkNotes: { s1: "Left fork seal weeping", xm3: "No record of last top end" }, photos: [], created: Date.now() - 4e8 },
+      { id: uid(), sample: true, make: "Honda", model: "CRF450RL", year: "2021", type: "dual", vin: "", hours: "", sellerName: "Maria T.", sellerPhone: "(208) 555-0192", sellerAddress: "Meridian, ID", listingUrl: "craigslist.org", asking: 8400, lowest: "", notes: "Says 1,900 miles, plated in Idaho. Bring a battery tester.", appt: localDT(2, 10, 0), status: "Scheduled", checks: {}, checkNotes: {}, photos: [], created: Date.now() - 2e8 },
+      { id: uid(), sample: true, make: "KTM", model: "300 XC-W", year: "2017", type: "enduro", vin: "VBKXCW43XHM123456", hours: "140", sellerName: "Dusty's Powersports", sellerPhone: "(208) 555-0110", sellerAddress: "Nampa, ID", listingUrl: "", asking: 4900, lowest: 4500, notes: "Sweet smell from the exhaust and oil film in the coolant. Passed.", appt: localDT(-6, 13, 0), status: "Passed", checks: ktm, checkNotes: { e6: "Oil film in radiator", e3: "White sweet-smelling smoke" }, photos: [], created: Date.now() - 6e8 },
+      { id: uid(), sample: true, make: "Kawasaki", model: "KLX140R", year: "2020", type: "trail", vin: "", hours: "", sellerName: "Jake R.", sellerPhone: "(208) 555-0147", sellerAddress: "Eagle, ID", listingUrl: "", asking: 2300, lowest: "", notes: "His kid's bike. Could bundle with the YZ.", appt: localDT(4, 16, 0), status: "Watching", checks: {}, checkNotes: {}, photos: [], created: Date.now() - 1e8 }
+    ],
+    sellers: { "jake r.": { trust: "trusted", notes: "Quick to reply, met on time." }, "dusty's powersports": { trust: "caution", notes: "Didn't mention the coolant issue until asked." } },
+    routeOff: [], routeOrder: []
+  };
+}
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
+if (!S || !Array.isArray(S.inspections)) S = seed();
+S.routeOff ||= []; S.routeOrder ||= []; S.sellers ||= {};
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+let view = { name: "home" }, filter = "All", openCats = {};
+const app = document.getElementById("app");
+const get = (id) => S.inspections.find((x) => x.id === id) || (draftNew && draftNew.id === id ? draftNew : undefined);
+
+/* ---------- Views ---------- */
+const ICON = {
+  back: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>`,
+  edit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>`,
+  list: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>`
+};
+const header = (title, back, right = "") => `<header class="top"><div class="top-in wrap">${back ? `<button class="icon-btn" data-act="go" data-to="${back}" aria-label="Back">${ICON.back}</button>` : ""}<h1>${esc(title)}</h1>${right}</div></header>`;
+
+function cardHTML(x) {
+  const s = x.status;
+  return `<div class="card" role="button" tabindex="0" data-act="open" data-id="${x.id}">
+    ${mono(x.make)}
+    <div class="body">
+      <div class="title">${esc(bikeName(x))}</div>
+      <div class="sub">${esc(x.sellerName || "No seller yet")}${x.asking ? " · " + money(x.asking) : ""}${x.lowest ? ` <span style="color:var(--good)">→ ${money(x.lowest)}</span>` : ""}</div>
+      <div class="meta">
+        <span class="tag s-${s}">${s}</span>
+        ${x.type ? `<span class="tag type">${TYPES[x.type].short}</span>` : ""}
+        ${x.sample ? `<span class="tag sample">Sample</span>` : ""}
+        ${x.appt && (s === "Scheduled" || s === "Watching") ? `<span style="color:var(--orange);font-weight:600">${fmtWhen(x.appt)}</span>` : ""}
+        ${x.listingUrl ? `<a class="link-sm" href="${esc(normUrl(x.listingUrl))}" target="_blank" rel="noopener" data-stop>View listing</a>` : ""}
+        ${x.sellerAddress ? `<a class="link-sm" href="${esc(mapsDir(x.sellerAddress))}" target="_blank" rel="noopener" data-stop>Directions</a>` : ""}
+      </div>
+    </div>
+    ${scoreBadge(x)}
+  </div>`;
+}
+
+function renderHome() {
+  const xs = [...S.inspections].sort((a, b) => b.created - a.created);
+  const shown = filter === "All" ? xs : xs.filter((x) => x.status === filter);
+  const upcoming = xs.filter((x) => x.appt && new Date(x.appt) > new Date() && x.status !== "Passed" && x.status !== "Bought").sort((a, b) => new Date(a.appt) - new Date(b.appt))[0];
+  const count = (st) => xs.filter((x) => x.status === st).length;
+  return `
+  <div class="wrap">
+    <div class="hero">
+      <img class="logo" src="${LOGO}" alt="SEND IT! Used Dirt Bike Inspector">
+      <button class="start-btn" data-act="new" aria-label="Start new inspection"><img src="${START_BTN}" alt=""></button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>${count("Scheduled")}</b><span>Scheduled</span></div>
+      <div class="stat"><b>${count("Inspected")}</b><span>Inspected</span></div>
+      <div class="stat"><b>${count("Bought")}</b><span>Bought</span></div>
+    </div>
+    ${upcoming ? `<div class="section-h">Next appointment</div>
+    <div class="next-appt" role="button" tabindex="0" data-act="open" data-id="${upcoming.id}">
+      ${mono(upcoming.make)}
+      <div style="flex:1;min-width:0"><div class="when">${fmtWhen(upcoming.appt)}</div><div>${esc(bikeName(upcoming))} · ${esc(upcoming.sellerName)}</div>
+      ${upcoming.sellerAddress ? `<a class="link-sm" href="${esc(mapsDir(upcoming.sellerAddress))}" target="_blank" rel="noopener" data-stop>Directions to ${esc(upcoming.sellerAddress)}</a>` : ""}</div>
+    </div>` : ""}
+    <div class="section-h">Saved inspections <small>${xs.length} bikes</small></div>
+    <div class="chips" role="group" aria-label="Filter by status">${["All", ...STATUSES].map((st) => `<button class="chip" data-act="filter" data-f="${st}" aria-pressed="${filter === st}">${st}</button>`).join("")}</div>
+    <div class="list" style="margin-top:10px">${shown.length ? shown.map(cardHTML).join("") : `<div class="empty">No bikes marked ${esc(filter)} yet.</div>`}</div>
+    <div class="footer-note">Bikes marked Sample are example data. Your inspections save on this device.<br><button data-act="reset">Reset to sample data</button></div>
+  </div>`;
+}
+
+function renderDetails(x) {
+  const auto = classify(x.make, x.model);
+  const vin = decodeVin(x.vin);
+  const isNew = !x.make && !x.model && !x.sellerName;
+  return header(isNew ? "New inspection" : "Bike details", x._fromReport ? "report" : "home") + `
+  <form class="form wrap" id="details" autocomplete="off">
+    <fieldset><legend>The bike</legend>
+      <div class="row">
+        <div class="field"><label for="make">Make</label><select id="make" name="make"><option value="">Choose…</option>${MAKES.map((m) => `<option ${x.make === m ? "selected" : ""}>${m}</option>`).join("")}</select></div>
+        <div class="field"><label for="year">Year</label><input id="year" name="year" inputmode="numeric" maxlength="4" placeholder="2019" value="${esc(x.year)}"></div>
+      </div>
+      <div class="field"><label for="model">Model</label><input id="model" name="model" placeholder="e.g. YZ250F, CRF250L, 300 XC-W" value="${esc(x.model)}"></div>
+      <div class="detect" id="detect">${detectHTML(x, auto)}</div>
+      <div class="row">
+        <div class="field"><label for="hours">Hours / miles</label><input id="hours" name="hours" inputmode="numeric" value="${esc(x.hours)}"></div>
+        <div class="field"><label for="status">Status</label><select id="status" name="status">${STATUSES.map((s) => `<option ${x.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></div>
+      </div>
+      <div class="field"><label for="vin">VIN</label><input id="vin" name="vin" class="mono-font" maxlength="17" placeholder="17 characters, on the steering head" value="${esc(x.vin)}" style="text-transform:uppercase"></div>
+      <div id="vinout">${vinHTML(vin)}</div>
+    </fieldset>
+    <fieldset><legend>Seller</legend>
+      <div class="field"><label for="sellerName">Name</label><input id="sellerName" name="sellerName" list="known-sellers" value="${esc(x.sellerName)}"><datalist id="known-sellers">${[...new Set(S.inspections.map((i) => i.sellerName).filter(Boolean))].map((n) => `<option value="${esc(n)}">`).join("")}</datalist></div>
+      <div class="row">
+        <div class="field"><label for="sellerPhone">Phone</label><input id="sellerPhone" name="sellerPhone" inputmode="tel" value="${esc(x.sellerPhone)}"></div>
+        <div class="field"><label for="appt">Appointment</label><input id="appt" name="appt" type="datetime-local" value="${esc(x.appt)}"></div>
+      </div>
+      <div class="field"><label for="sellerAddress">Address</label><input id="sellerAddress" name="sellerAddress" value="${esc(x.sellerAddress)}"></div>
+      <div class="field"><label for="listingUrl">Listing URL</label><input id="listingUrl" name="listingUrl" inputmode="url" placeholder="Paste the Marketplace, Craigslist or OfferUp link" value="${esc(x.listingUrl)}"></div>
+    </fieldset>
+    <fieldset><legend>Price</legend>
+      <div class="row">
+        <div class="field"><label for="asking">Asking</label><input id="asking" name="asking" inputmode="numeric" placeholder="$" value="${esc(x.asking)}"></div>
+        <div class="field"><label for="lowest">Lowest offered</label><input id="lowest" name="lowest" inputmode="numeric" placeholder="$" value="${esc(x.lowest)}"></div>
+      </div>
+      <div class="field"><label for="notes">Negotiation notes</label><textarea id="notes" name="notes">${esc(x.notes)}</textarea></div>
+    </fieldset>
+    <fieldset><legend>Photos</legend>
+      <div class="photos" id="photos">${photosHTML(x)}</div>
+      <input type="file" id="photo-in" accept="image/*" multiple hidden>
+    </fieldset>
+    <div class="actions">
+      <button type="submit" class="btn btn-primary btn-block">Start checklist</button>
+      <button type="button" class="btn btn-ghost btn-block" data-act="save-home">Save and go back</button>
+    </div>
+  </form>`;
+}
+function detectHTML(x, auto) {
+  const t = x.type;
+  const msg = auto ? `Detected <strong>${TYPES[auto].label}</strong>` : (x.model ? `Couldn't tell the type. Pick one:` : `Enter make and model to detect the bike type.`);
+  return `<div style="flex-basis:100%">${msg}${t && t !== auto ? ` <span class="hint">· you picked ${TYPES[t].label}</span>` : ""}</div>
+    ${Object.entries(TYPES).map(([k, v]) => `<button type="button" class="chip" data-act="type" data-t="${k}" aria-pressed="${t === k}">${v.label}</button>`).join("")}
+    ${t ? `<div class="hint" style="flex-basis:100%">Adds ${SPECIAL[t].checks.length} ${TYPES[t].label.toLowerCase()} checks to the inspection.</div>` : ""}`;
+}
+const vinHTML = (v) => !v ? `<div class="hint">Decodes the maker and model year offline.</div>` : `<div class="vin-out ${v.ok ? "ok" : "bad"}">${esc(v.msg)}</div>`;
+const photosHTML = (x) => x.photos.map((p, i) => `<div class="ph"><img src="${p}" alt="Bike photo ${i + 1}"><button type="button" data-act="rm-photo" data-i="${i}" aria-label="Remove photo">×</button></div>`).join("") + `<label class="add-photo" for="photo-in">+ Add<br>photo</label>`;
+
+function renderChecklist(x) {
+  const s = scoreOf(x);
+  const cats = categoriesFor(x);
+  return header(bikeName(x), "details", `<button class="icon-btn" data-act="go" data-to="report" aria-label="Report">${ICON.list}</button>`) + `
+  <div class="prog wrap"><div class="bar"><i style="width:${(s.answered / s.total) * 100}%"></i></div><span class="txt">${s.answered}/${s.total} checked</span>${scoreBadge(x)}</div>
+  <div class="wrap">
+    ${cats.map((c, ci) => {
+      const done = c.checks.filter((k) => x.checks[k[0]]).length;
+      const open = openCats[c.id] ?? (ci === 0 || c.id.startsWith("x-"));
+      return `<section class="cat ${c.id.startsWith("x-") ? "special" : ""}">
+        <button class="cat-h" data-act="cat" data-c="${c.id}" aria-expanded="${open}"><b>${c.name}</b><span>${done}/${c.checks.length} ${open ? "▴" : "▾"}</span></button>
+        ${open ? c.checks.map(([id, q, how, crit]) => {
+          const g = x.checks[id];
+          return `<div class="check ${g === "issue" ? "is-issue" : ""}">
+            <div class="q">${esc(q)} ${crit ? `<span class="crit">Dealbreaker</span>` : ""}</div>
+            <div class="how">${esc(how)}</div>
+            <div class="grade" role="group" aria-label="${esc(q)}">
+              <button class="g" data-act="grade" data-k="${id}" data-g="good" aria-pressed="${g === "good"}">Good</button>
+              <button class="i" data-act="grade" data-k="${id}" data-g="issue" aria-pressed="${g === "issue"}">Issue</button>
+              <button class="s" data-act="grade" data-k="${id}" data-g="skip" aria-pressed="${g === "skip"}">Skip</button>
+            </div>
+            ${g === "issue" ? `<textarea data-note="${id}" id="note-${id}" placeholder="What's wrong? Estimated repair cost?">${esc(x.checkNotes[id] || "")}</textarea>` : ""}
+          </div>`;
+        }).join("") : ""}
+      </section>`;
+    }).join("")}
+    <div class="actions" style="padding-top:16px"><button class="btn btn-primary btn-block" data-act="go" data-to="report">See the verdict</button></div>
+  </div>`;
+}
+
+function renderReport(x) {
+  const s = scoreOf(x);
+  const words = { send: "Clean bike. Pay a fair price and ride it home.", neg: "Fixable issues. Use them to talk the price down.", walk: s.red.length ? `${s.red.length} dealbreaker${s.red.length > 1 ? "s" : ""} found. Walk away unless the price covers it.` : "Too many problems for the price.", none: s.answered ? `Check at least half the list for a verdict (${s.answered}/${s.total}).` : "Run the checklist to get a verdict." };
+  const saved = x.asking && x.lowest ? x.asking - x.lowest : null;
+  return header("Report", "home", `<button class="icon-btn" data-act="edit" aria-label="Edit details">${ICON.edit}</button>`) + `
+  <div class="wrap" style="display:grid;gap:12px;padding-bottom:20px">
+    <div class="verdict v-${s.v}">
+      <div><div class="big">${s.v === "none" ? s.label : s.label + (s.v === "send" ? "!" : "")}</div><p>${words[s.v]}</p></div>
+      <div class="pct">${s.pct ?? "–"}${s.pct !== null ? "<small>% good</small>" : ""}</div>
+    </div>
+    <div class="panel" style="display:flex;gap:12px;align-items:center">${mono(x.make)}<div style="min-width:0"><div style="font-weight:700;font-size:17px">${esc(bikeName(x))}</div><div class="hint">${x.type ? TYPES[x.type].label + " · " : ""}${x.hours ? esc(x.hours) + " hrs/mi · " : ""}<span class="tag s-${x.status}">${x.status}</span></div></div></div>
+    <div class="price-row">
+      <div><b>${money(x.asking)}</b><span>Asking</span></div>
+      <div><b style="color:var(--good)">${money(x.lowest)}</b><span>Lowest</span></div>
+      <div><b>${saved ? money(saved) : "–"}</b><span>Saved</span></div>
+    </div>
+    ${s.red.length || s.issues.length ? `<div class="panel"><div class="section-h" style="margin-top:0">Problems found</div><ul class="flag-list">
+      ${s.red.map((c) => `<li class="red"><b>⚠ ${esc(c.q)}</b><span>${esc(x.checkNotes[c.id] || c.cat)}</span></li>`).join("")}
+      ${s.issues.map((c) => `<li><b>${esc(c.q)}</b><span>${esc(x.checkNotes[c.id] || c.cat)}</span></li>`).join("")}
+    </ul></div>` : ""}
+    <div class="panel"><div class="section-h" style="margin-top:0">Checklist <small>${s.good} good · ${s.issue} issues · ${s.skip} skipped</small></div>
+      <button class="btn btn-ghost btn-block" data-act="go" data-to="checklist">${s.answered ? "Continue checklist" : "Start checklist"} (${s.answered}/${s.total})</button></div>
+    <div class="panel"><div class="section-h" style="margin-top:0">Seller</div>
+      <dl class="kv">
+        <dt>Name</dt><dd>${esc(x.sellerName || "–")}</dd>
+        <dt>Phone</dt><dd><span class="num" style="user-select:all">${esc(x.sellerPhone || "–")}</span></dd>
+        <dt>Address</dt><dd>${x.sellerAddress ? `<a href="${esc(mapsDir(x.sellerAddress))}" target="_blank" rel="noopener">${esc(x.sellerAddress)}</a>` : "–"}</dd>
+        <dt>Appointment</dt><dd>${x.appt ? fmtWhen(x.appt) : "–"}</dd>
+        <dt>Listing</dt><dd>${x.listingUrl ? `<a href="${esc(normUrl(x.listingUrl))}" target="_blank" rel="noopener">View original listing</a>` : "–"}</dd>
+        <dt>VIN</dt><dd class="mono-font">${esc(x.vin || "–")}</dd>
+      </dl>
+      ${x.notes ? `<p style="margin:10px 0 0;font-size:14px;color:var(--muted)">${esc(x.notes)}</p>` : ""}
+    </div>
+    ${x.photos.length ? `<div class="panel"><div class="section-h" style="margin-top:0">Photos</div><div class="photos">${x.photos.map((p) => `<div class="ph"><img src="${p}" alt=""></div>`).join("")}</div></div>` : ""}
+    <div class="panel"><div class="section-h" style="margin-top:0">Mark as</div><div class="chips" style="flex-wrap:wrap">${STATUSES.map((st) => `<button class="chip" data-act="status" data-s="${st}" aria-pressed="${x.status === st}">${st}</button>`).join("")}</div></div>
+    <button class="btn btn-danger btn-block" data-act="delete">Delete this inspection</button>
+  </div>`;
+}
+
+function renderSellers() {
+  const groups = {};
+  for (const x of S.inspections) { if (!x.sellerName) continue; const k = sellerKey(x.sellerName); (groups[k] ||= { name: x.sellerName, phone: "", address: "", bikes: [] }).bikes.push(x); if (x.sellerPhone) groups[k].phone = x.sellerPhone; if (x.sellerAddress) groups[k].address = x.sellerAddress; }
+  const list = Object.entries(groups).sort((a, b) => b[1].bikes.length - a[1].bikes.length);
+  const trustLabel = { trusted: "Trusted", caution: "Caution", flaky: "Flaky", "": "Not rated" };
+  return header("Sellers") + `<div class="wrap" style="display:grid;gap:10px;padding-block:14px">
+    <div class="hint">Every seller you've added a bike from. Tap the rating to cycle Trusted, Caution and Flaky.</div>
+    ${list.length ? list.map(([k, g]) => {
+      const meta = S.sellers[k] || {}; const t = meta.trust || "";
+      const initials = g.name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+      return `<div class="seller">
+        <div class="seller-h"><div class="avatar">${esc(initials)}</div><div class="nm">${esc(g.name)}<div class="hint" style="font-weight:400">${g.bikes.length} bike${g.bikes.length > 1 ? "s" : ""}</div></div>
+          <button class="trust t-${t}" data-act="trust" data-k="${esc(k)}">${trustLabel[t]}</button></div>
+        <div class="contact">${g.phone ? `<span class="num">${esc(g.phone)}</span><button class="copy" data-act="copy" data-v="${esc(g.phone)}">Copy</button>` : ""}${g.address ? `<a href="${esc(mapsDir(g.address))}" target="_blank" rel="noopener">${esc(g.address)}</a>` : ""}</div>
+        ${g.bikes.map((b) => `<button class="bike-line" data-act="open" data-id="${b.id}"><span class="l">${esc(bikeName(b))} · ${money(b.lowest || b.asking)}</span><span class="tag s-${b.status}">${b.status}</span></button>`).join("")}
+        <div class="field"><label for="sn-${esc(k)}">Notes on this seller</label><textarea id="sn-${esc(k)}" data-snote="${esc(k)}" placeholder="Responsive? Honest about issues?">${esc(meta.notes || "")}</textarea></div>
+      </div>`;
+    }).join("") : `<div class="empty">Add a bike with a seller name and they'll show up here.</div>`}
+  </div>`;
+}
+
+function routeStops() {
+  const cands = S.inspections.filter((x) => x.sellerAddress && x.status !== "Passed" && x.status !== "Bought");
+  const order = S.routeOrder.filter((id) => cands.some((c) => c.id === id));
+  const rest = cands.filter((c) => !order.includes(c.id)).sort((a, b) => new Date(a.appt || 8.64e15) - new Date(b.appt || 8.64e15)).map((c) => c.id);
+  S.routeOrder = [...order, ...rest];
+  return S.routeOrder.map(get);
+}
+function renderRoute() {
+  const stops = routeStops();
+  const on = stops.filter((x) => !S.routeOff.includes(x.id));
+  let url = "";
+  if (on.length) {
+    const addrs = on.map((x) => x.sellerAddress);
+    url = "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(addrs[addrs.length - 1]) + (addrs.length > 1 ? "&waypoints=" + encodeURIComponent(addrs.slice(0, -1).join("|")) : "") + "&travelmode=driving";
+  }
+  let n = 0;
+  return header("Route") + `<div class="wrap" style="display:grid;gap:8px;padding-block:14px">
+    <div class="hint">Plan a day of looking at bikes. Pick the stops, put them in order, then open the route in Google Maps starting from where you are.</div>
+    ${stops.length ? stops.map((x, i) => {
+      const off = S.routeOff.includes(x.id);
+      return `<div class="stop ${off ? "off" : ""}">
+        <div style="display:grid;gap:6px;justify-items:center"><input type="checkbox" class="toggle" id="rt-${x.id}" data-act="route-toggle" data-id="${x.id}" ${off ? "" : "checked"} aria-label="Include ${esc(bikeName(x))}"><div class="n">${off ? "–" : ++n}</div></div>
+        <div class="body"><div style="font-weight:700">${esc(bikeName(x))}</div><div class="addr">${esc(x.sellerName)} · ${esc(x.sellerAddress)}</div>${x.appt ? `<div class="hint" style="color:var(--orange)">${fmtWhen(x.appt)}</div>` : ""}</div>
+        <div class="updn"><button data-act="mv" data-id="${x.id}" data-d="-1" ${i === 0 ? "disabled" : ""} aria-label="Move up">▲</button><button data-act="mv" data-id="${x.id}" data-d="1" ${i === stops.length - 1 ? "disabled" : ""} aria-label="Move down">▼</button></div>
+      </div>`;
+    }).join("") : `<div class="empty">Bikes with a seller address show up here.</div>`}
+    ${on.length ? `<a class="btn btn-primary btn-block" style="text-decoration:none;margin-top:8px" href="${esc(url)}" target="_blank" rel="noopener">Open ${on.length}-stop route in Maps</a>` : ""}
+  </div>`;
+}
+
+/* ---------- Render & routing ---------- */
+function render() {
+  const x = view.id ? get(view.id) : null;
+  let html = "";
+  if (view.name === "home") html = renderHome();
+  else if (view.name === "sellers") html = renderSellers();
+  else if (view.name === "route") html = renderRoute();
+  else if (!x) { view = { name: "home" }; return render(); }
+  else if (view.name === "details") html = renderDetails(x);
+  else if (view.name === "checklist") html = renderChecklist(x);
+  else if (view.name === "report") html = renderReport(x);
+  app.innerHTML = html;
+  const tab = ["sellers", "route"].includes(view.name) ? view.name : "home";
+  document.querySelectorAll(".tabs button").forEach((b) => { if (b.dataset.tab === tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+  if (view.name === "details") bindDetails(x);
+}
+function go(name, id) { view = { name, id: id ?? view.id }; render(); window.scrollTo(0, 0); }
+
+let draftNew = null;
+function readForm(x) {
+  const f = document.getElementById("details"); if (!f) return;
+  for (const el of f.elements) if (el.name) x[el.name] = el.name === "vin" ? el.value.toUpperCase().trim() : el.value;
+  if (!x.type) x.type = classify(x.make, x.model);
+  save();
+}
+function bindDetails(x) {
+  const f = document.getElementById("details");
+  f.addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.name === "make" || t.name === "model") {
+      x[t.name] = t.value;
+      if (!x._typePicked) x.type = classify(x.make, x.model);
+      document.getElementById("detect").innerHTML = detectHTML(x, classify(x.make, x.model));
+    }
+    if (t.name === "vin") {
+      const v = decodeVin(t.value); document.getElementById("vinout").innerHTML = vinHTML(v);
+      if (v && v.ok && v.year && !document.getElementById("year").value) document.getElementById("year").value = v.year;
+    }
+  });
+  f.addEventListener("change", () => readForm(x));
+  f.addEventListener("submit", (e) => { e.preventDefault(); readForm(x); commitDraft(x); go("checklist", x.id); });
+  document.getElementById("photo-in").addEventListener("change", async (e) => {
+    for (const file of e.target.files) { try { x.photos.push(await compress(file)); } catch (err) {} }
+    e.target.value = ""; save(); document.getElementById("photos").innerHTML = photosHTML(x);
+  });
+}
+function commitDraft(x) { if (draftNew && draftNew.id === x.id) { S.inspections.push(x); draftNew = null; } delete x._typePicked; delete x._fromReport; save(); }
+function compress(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => { const img = new Image(); img.onload = () => { const k = Math.min(1, 900 / Math.max(img.width, img.height)); const c = document.createElement("canvas"); c.width = img.width * k; c.height = img.height * k; c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); res(c.toDataURL("image/jpeg", 0.7)); }; img.onerror = rej; img.src = r.result; };
+    r.onerror = rej; r.readAsDataURL(file);
+  });
+}
+function toast(msg) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 1800); }
+function confirmSheet(title, body, okLabel, onOk) {
+  const d = document.createElement("div"); d.className = "confirm";
+  d.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><h3>${esc(title)}</h3><div class="hint" style="font-size:14px">${esc(body)}</div><button class="btn btn-danger btn-block" data-ok>${esc(okLabel)}</button><button class="btn btn-ghost btn-block" data-cancel>Cancel</button></div>`;
+  d.addEventListener("click", (e) => { if (e.target.closest("[data-ok]")) { d.remove(); onOk(); } else if (e.target.closest("[data-cancel]") || e.target === d) d.remove(); });
+  document.body.appendChild(d); d.querySelector("[data-cancel]").focus();
+}
+
+/* ---------- Events ---------- */
+document.querySelector(".tabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; if (draftNew) draftNew = null; view = { name: b.dataset.tab }; render(); window.scrollTo(0, 0); });
+
+app.addEventListener("click", (e) => {
+  if (e.target.closest("[data-stop]")) return;
+  const el = e.target.closest("[data-act]"); if (!el) return;
+  const act = el.dataset.act;
+  const x = view.id ? get(view.id) : null;
+  if (act === "new") { draftNew = { id: uid(), make: "", model: "", year: "", type: null, vin: "", hours: "", sellerName: "", sellerPhone: "", sellerAddress: "", listingUrl: "", asking: "", lowest: "", notes: "", appt: "", status: "Watching", checks: {}, checkNotes: {}, photos: [], created: Date.now() }; go("details", draftNew.id); }
+  else if (act === "open") { const t = get(el.dataset.id); go(scoreOf(t).answered || t.status === "Inspected" || t.status === "Passed" || t.status === "Bought" ? "report" : "details", t.id); }
+  else if (act === "filter") { filter = el.dataset.f; render(); }
+  else if (act === "go") {
+    if (view.name === "details" && x) { readForm(x); if (el.dataset.to === "home") { if (draftNew && draftNew.id === x.id && !(x.make || x.model || x.sellerName)) draftNew = null; else commitDraft(x); } }
+    go(el.dataset.to);
+  }
+  else if (act === "save-home") { readForm(x); commitDraft(x); toast("Saved"); go("home"); }
+  else if (act === "type") { x.type = el.dataset.t; x._typePicked = true; document.getElementById("detect").innerHTML = detectHTML(x, classify(x.make, x.model)); save(); }
+  else if (act === "rm-photo") { x.photos.splice(Number(el.dataset.i), 1); save(); document.getElementById("photos").innerHTML = photosHTML(x); }
+  else if (act === "cat") { const c = el.dataset.c; openCats[c] = el.getAttribute("aria-expanded") !== "true"; keepScroll(render); }
+  else if (act === "grade") {
+    const k = el.dataset.k; x.checks[k] = x.checks[k] === el.dataset.g ? undefined : el.dataset.g;
+    if (!x.checks[k]) delete x.checks[k];
+    if (x.status === "Watching" || x.status === "Scheduled") x.status = "Inspected";
+    save(); keepScroll(render);
+    if (x.checks[k] === "issue") { const ta = document.getElementById("note-" + k); ta && ta.focus({ preventScroll: true }); }
+  }
+  else if (act === "edit") { x._fromReport = true; go("details"); }
+  else if (act === "status") { x.status = el.dataset.s; save(); render(); toast("Marked " + x.status); }
+  else if (act === "delete") confirmSheet("Delete inspection?", `${bikeName(x)} and its checklist will be removed from this device.`, "Delete", () => { S.inspections = S.inspections.filter((i) => i.id !== x.id); save(); go("home"); toast("Deleted"); });
+  else if (act === "reset") confirmSheet("Reset to sample data?", "This replaces everything saved on this device with the four example bikes.", "Reset", () => { S = seed(); save(); filter = "All"; render(); toast("Sample data restored"); });
+  else if (act === "trust") { const k = el.dataset.k; const order = ["", "trusted", "caution", "flaky"]; const m = (S.sellers[k] ||= {}); m.trust = order[(order.indexOf(m.trust || "") + 1) % order.length]; save(); keepScroll(render); }
+  else if (act === "copy") { const v = el.dataset.v; navigator.clipboard?.writeText(v).then(() => toast("Copied " + v), () => toast("Select the number to copy it")); }
+  else if (act === "mv") { const i = S.routeOrder.indexOf(el.dataset.id), j = i + Number(el.dataset.d); if (j >= 0 && j < S.routeOrder.length) { [S.routeOrder[i], S.routeOrder[j]] = [S.routeOrder[j], S.routeOrder[i]]; save(); keepScroll(render); } }
+  else if (act === "route-toggle") { const id = el.dataset.id; S.routeOff = el.checked ? S.routeOff.filter((i) => i !== id) : [...S.routeOff, id]; save(); keepScroll(render); }
+});
+app.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.matches('[role="button"]')) { e.preventDefault(); e.target.click(); } });
+app.addEventListener("input", (e) => {
+  const t = e.target;
+  if (t.dataset.note) { const x = get(view.id); x.checkNotes[t.dataset.note] = t.value; save(); }
+  if (t.dataset.snote) { (S.sellers[t.dataset.snote] ||= {}).notes = t.value; save(); }
+});
+function keepScroll(fn) { const y = window.scrollY; fn(); window.scrollTo(0, y); }
+render();
+if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+</script>
+
+</body>
+</html>
