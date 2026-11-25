@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f0e0c">
-<meta name="description" content="Inspect used dirt bikes before you buy: guided checklist, seller tracking and route planning.">
+<meta name="description" content="Don't get burned on a used dirt bike. Guided pre-purchase inspection with a send it, negotiate or walk away verdict, plus seller tracking and route planning.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -218,6 +218,25 @@ legend { font-family: var(--display); font-weight: 700; letter-spacing: .1em; te
 .share-view .sv-img img { max-height: 100%; max-width: 100%; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.6); -webkit-touch-callout: default; }
 .share-view .sv-actions { display: grid; gap: 8px; max-width: 448px; width: 100%; margin: 0 auto; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; z-index: 50; }
+.howto-link { background: none; border: 0; color: var(--dirt); font-weight: 700; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; padding: 4px 8px; }
+.welcome { background: var(--panel); border: 1px solid #6b4317; border-radius: 14px; padding: 14px; display: grid; gap: 10px; margin-top: 6px; }
+.welcome h2 { margin: 0; font-family: var(--display); font-size: 22px; text-transform: uppercase; letter-spacing: .03em; }
+.welcome p { margin: 0; color: var(--muted); font-size: 14px; }
+.welcome .row2 { display: flex; gap: 8px; flex-wrap: wrap; }
+.help { display: grid; gap: 14px; padding-block: 16px 24px; }
+.help .lede { font-size: 17px; line-height: 1.5; margin: 0; }
+.help .lede b { color: var(--orange); }
+.help h2 { font-family: var(--display); font-size: 18px; letter-spacing: .1em; text-transform: uppercase; color: var(--dirt); margin: 8px 0 0; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: step; }
+.steps li { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 12px 12px 56px; position: relative; counter-increment: step; }
+.steps li::before { content: counter(step); position: absolute; left: 12px; top: 12px; width: 32px; height: 32px; border-radius: 50%; background: var(--orange); color: var(--on-accent); display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: 18px; }
+.steps b { display: block; font-size: 16px; margin-bottom: 2px; }
+.steps p, .help .panel p { margin: 0; color: var(--muted); font-size: 14px; }
+.verdict-key { display: grid; gap: 8px; }
+.verdict-key div { display: grid; grid-template-columns: 116px 1fr; gap: 10px; align-items: center; font-size: 14px; }
+.verdict-key .score { font-size: 16px; font-weight: 800; padding: 8px 6px; text-transform: uppercase; letter-spacing: .04em; }
+.tips { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--muted); font-size: 14px; }
+.tips b { color: var(--fg); }
 .footer-note { text-align: center; color: var(--muted); font-size: 12px; padding-block: 24px 8px; }
 .footer-note button { background: none; border: 0; color: var(--muted); text-decoration: underline; font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -480,7 +499,13 @@ function renderHome() {
     <div class="hero">
       <img class="logo" src="${LOGO}" alt="SEND IT! Used Dirt Bike Inspector">
       <button class="start-btn" data-act="new" aria-label="Start new inspection"><img src="${START_BTN}" alt=""></button>
+      <button class="howto-link" data-act="go" data-to="help">How it works</button>
     </div>
+    ${S.introDone ? "" : `<div class="welcome">
+      <h2>Don't get burned on a used bike</h2>
+      <p>Walk through a full pre-purchase inspection on your phone, spot the dealbreakers, and get a straight answer: send it, negotiate or walk away. The bikes below are examples so you can look around.</p>
+      <div class="row2"><button class="btn btn-primary" style="font-size:16px;padding:10px 14px" data-act="go" data-to="help">Show me how</button><button class="btn btn-ghost" style="padding:10px 14px" data-act="intro-done">Got it</button></div>
+    </div>`}
     <div class="stats">
       <div class="stat"><b>${count("Scheduled")}</b><span>Scheduled</span></div>
       <div class="stat"><b>${count("Inspected")}</b><span>Inspected</span></div>
@@ -625,6 +650,50 @@ function renderReport(x) {
   </div>`;
 }
 
+function renderHelp() {
+  return header("How it works", "home") + `<div class="wrap help">
+    <p class="lede"><b>SEND IT!</b> is your pocket inspector for buying a used dirt bike. It walks you through ${BASE.reduce((n, c) => n + c.checks.length, 0)} checks a mechanic would make, plus extra checks for motocross, trail, dual-sport and enduro bikes. It flags the problems that should kill a deal and tells you whether to send it, negotiate or walk away. It also keeps every bike, seller and appointment in one place while you shop.</p>
+
+    <h2>Buying a bike, step by step</h2>
+    <ol class="steps">
+      <li><b>Add the bike</b><p>Tap <em>Start New Inspection</em> and enter the make and model. The app works out whether it's a motocross, trail, dual-sport or enduro bike and adds the right checks. Paste the listing link, the seller's name and number, the asking price and when you're meeting.</p></li>
+      <li><b>Check the VIN</b><p>At the bike, type the VIN from the steering head. The app shows the maker and model year so you can catch a bike that isn't what the ad says.</p></li>
+      <li><b>Go through the checklist</b><p>Mark each item <em>Good</em>, <em>Issue</em> or <em>Skip</em>. Each one tells you what to look for. Items marked <span class="crit">Dealbreaker</span> are the ones that can cost more than the bike is worth. When you mark an issue, jot down what's wrong and what it might cost to fix.</p></li>
+      <li><b>Get the verdict</b><p>Tap <em>See the verdict</em>. You'll see the score, every problem found, and a straight answer.</p></li>
+      <li><b>Negotiate and share</b><p>Use the problem list to back up your offer and record the lowest price the seller will take. Tap <em>Share report</em> to text the results to a buddy or show the seller.</p></li>
+      <li><b>Keep track</b><p>Mark each bike Watching, Scheduled, Inspected, Bought or Passed. The <em>Sellers</em> tab keeps everyone you've dealt with, with a Trusted, Caution or Flaky rating. The <em>Route</em> tab lines up several viewings in one trip and opens it in Google Maps.</p></li>
+    </ol>
+
+    <h2>What the verdict means</h2>
+    <div class="panel verdict-key">
+      <div><span class="score v-send">Send it</span><span>85% or more of checks good and no dealbreakers. Pay a fair price and ride it home.</span></div>
+      <div><span class="score v-neg">Negotiate</span><span>65 to 84% good. Real issues, but fixable. Use them to bring the price down.</span></div>
+      <div><span class="score v-walk">Walk away</span><span>Any dealbreaker, or under 65% good. Only buy if the price covers the repair.</span></div>
+      <p>You need to check at least half the list before the app gives a verdict. Skipped items don't count against the bike.</p>
+    </div>
+
+    <h2>Tips from the pits</h2>
+    <ul class="tips">
+      <li><b>Ask the seller not to start it</b> before you get there. A bike that's already warm can hide a hard cold start.</li>
+      <li><b>Bring</b> a flashlight, a rag, gloves and cash. Wear riding boots if they'll let you test ride.</li>
+      <li><b>Check the title against the VIN</b> before you hand over money. No title, or a name that isn't the seller's, means walk.</li>
+      <li><b>Look under the bike.</b> Scraped frame rails and a dented skid plate tell you how hard it was ridden.</li>
+      <li><b>Ask for the hours and when the top end was done.</b> Receipts beat stories.</li>
+    </ul>
+
+    <h2>Put it on your home screen</h2>
+    <div class="panel" style="display:grid;gap:6px">
+      <p><b style="color:var(--fg)">iPhone:</b> open the app in Safari, tap Share, then <em>Add to Home Screen</em>.</p>
+      <p><b style="color:var(--fg)">Android:</b> open it in Chrome, tap the ⋮ menu, then <em>Install app</em>.</p>
+      <p>Once installed, it opens full screen and works with no signal, which helps out in the sticks.</p>
+    </div>
+
+    <h2>Your data</h2>
+    <div class="panel"><p>Everything you enter stays on your phone. Nothing is uploaded and there's no account to make. If you clear your browser's data or delete the app, your inspections go with it.</p></div>
+
+    <button class="btn btn-primary btn-block" data-act="new">Start an inspection</button>
+  </div>`;
+}
 function renderSellers() {
   const groups = {};
   for (const x of S.inspections) { if (!x.sellerName) continue; const k = sellerKey(x.sellerName); (groups[k] ||= { name: x.sellerName, phone: "", address: "", bikes: [] }).bikes.push(x); if (x.sellerPhone) groups[k].phone = x.sellerPhone; if (x.sellerAddress) groups[k].address = x.sellerAddress; }
@@ -683,6 +752,7 @@ function render() {
   if (view.name === "home") html = renderHome();
   else if (view.name === "sellers") html = renderSellers();
   else if (view.name === "route") html = renderRoute();
+  else if (view.name === "help") html = renderHelp();
   else if (!x) { view = { name: "home" }; return render(); }
   else if (view.name === "details") html = renderDetails(x);
   else if (view.name === "checklist") html = renderChecklist(x);
@@ -851,6 +921,7 @@ app.addEventListener("click", (e) => {
   else if (act === "filter") { filter = el.dataset.f; render(); }
   else if (act === "go") {
     if (view.name === "details" && x) { readForm(x); if (el.dataset.to === "home") { if (draftNew && draftNew.id === x.id && !(x.make || x.model || x.sellerName)) draftNew = null; else commitDraft(x); } }
+    if (el.dataset.to === "help" && !S.introDone) { S.introDone = true; save(); }
     go(el.dataset.to);
   }
   else if (act === "save-home") { readForm(x); commitDraft(x); toast("Saved"); go("home"); }
@@ -867,6 +938,7 @@ app.addEventListener("click", (e) => {
   else if (act === "edit") { x._fromReport = true; go("details"); }
   else if (act === "status") { x.status = el.dataset.s; save(); render(); toast("Marked " + x.status); }
   else if (act === "share") shareReport(x);
+  else if (act === "intro-done") { S.introDone = true; save(); render(); }
   else if (act === "delete") confirmSheet("Delete inspection?", `${bikeName(x)} and its checklist will be removed from this device.`, "Delete", () => { S.inspections = S.inspections.filter((i) => i.id !== x.id); save(); go("home"); toast("Deleted"); });
   else if (act === "reset") confirmSheet("Reset to sample data?", "This replaces everything saved on this device with the four example bikes.", "Reset", () => { S = seed(); save(); filter = "All"; render(); toast("Sample data restored"); });
   else if (act === "trust") { const k = el.dataset.k; const order = ["", "trusted", "caution", "flaky"]; const m = (S.sellers[k] ||= {}); m.trust = order[(order.indexOf(m.trust || "") + 1) % order.length]; save(); keepScroll(render); }

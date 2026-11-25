@@ -1,7 +1,7 @@
 {
   "name": "SEND IT! Used Dirt Bike Inspector",
   "short_name": "SEND IT!",
-  "description": "Inspect used dirt bikes before you buy: guided checklist, seller tracking and route planning.",
+  "description": "Don't get burned on a used dirt bike. Guided pre-purchase inspection with a send it, negotiate or walk away verdict, plus seller tracking and route planning.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
