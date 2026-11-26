@@ -103,6 +103,9 @@ a { color: var(--orange); }
 .cbtn:active { background: var(--line); }
 .cbtn.sm { padding: 3px 9px; font-size: 12px; border-radius: 7px; gap: 4px; }
 .cbtn.sm svg { width: 12px; height: 12px; }
+.del-sm { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; font-size: 12px; font-weight: 700; border-radius: 7px; background: transparent; border: 1px solid #6b2a20; color: #f3a497; }
+.del-sm svg { width: 12px; height: 12px; }
+.toast button { background: none; border: 0; color: var(--orange); font-weight: 800; margin-left: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 0; }
 .link-sm { font-size: 12px; font-weight: 600; }
 .empty { border: 1px dashed var(--line); border-radius: 14px; padding: 22px; text-align: center; color: var(--muted); }
 
@@ -503,6 +506,7 @@ function cardHTML(x) {
         ${x.listingUrl ? `<a class="link-sm" href="${esc(normUrl(x.listingUrl))}" target="_blank" rel="noopener" data-stop>View listing</a>` : ""}
         ${x.sellerAddress ? `<a class="link-sm" href="${esc(mapsDir(x.sellerAddress))}" target="_blank" rel="noopener" data-stop>Directions</a>` : ""}
         ${x.status !== "Passed" && x.status !== "Bought" ? contactBtns(x.sellerPhone, x.sellerName, [x], true) : ""}
+        <button class="del-sm" data-act="del-bike" data-id="${x.id}" aria-label="Delete ${esc(bikeName(x))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Delete</button>
       </div>
     </div>
     ${scoreBadge(x)}
@@ -541,7 +545,7 @@ function renderHome() {
     <div class="section-h">Saved inspections <small>${xs.length} bikes</small></div>
     <div class="chips" role="group" aria-label="Filter by status">${["All", ...STATUSES].map((st) => `<button class="chip" data-act="filter" data-f="${st}" aria-pressed="${filter === st}">${st}</button>`).join("")}</div>
     <div class="list" style="margin-top:10px">${shown.length ? shown.map(cardHTML).join("") : `<div class="empty">No bikes marked ${esc(filter)} yet.</div>`}</div>
-    <div class="footer-note">Bikes marked Sample are example data. Your inspections save on this device.<br><button data-act="reset">Reset to sample data</button></div>
+    <div class="footer-note">Bikes marked Sample are example data. Your inspections save on this device.<br>${S.inspections.some((i) => i.sample) ? `<button data-act="clear-samples">Remove sample bikes</button> · ` : ""}<button data-act="reset">Reset to sample data</button></div>
   </div>`;
 }
 
@@ -588,6 +592,7 @@ function renderDetails(x) {
     <div class="actions">
       <button type="submit" class="btn btn-primary btn-block">Start checklist</button>
       <button type="button" class="btn btn-ghost btn-block" data-act="save-home">Save and go back</button>
+      ${S.inspections.some((i) => i.id === x.id) ? `<button type="button" class="btn btn-danger btn-block" data-act="del-bike" data-id="${x.id}">Delete this bike</button>` : ""}
     </div>
   </form>`;
 }
@@ -923,7 +928,22 @@ async function shareReport(x) {
   });
   document.body.appendChild(d); d.querySelector("[data-close]").focus();
 }
-function toast(msg) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 1800); }
+function toast(msg, undo) {
+  document.querySelectorAll(".toast").forEach((o) => o.remove());
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  if (undo) { const b = document.createElement("button"); b.textContent = "Undo"; b.onclick = () => { t.remove(); undo(); }; t.appendChild(b); }
+  document.body.appendChild(t); setTimeout(() => t.remove(), undo ? 6000 : 1800);
+}
+function deleteBike(x) {
+  const s = scoreOf(x);
+  confirmSheet(`Delete ${bikeName(x)}?`, `This removes the bike${s.answered ? `, its ${s.answered} checklist answers` : ""}${x.photos.length ? ` and ${x.photos.length} photo${x.photos.length > 1 ? "s" : ""}` : ""} from this phone.`, "Delete bike", () => {
+    const idx = S.inspections.findIndex((i) => i.id === x.id); if (idx < 0) return;
+    S.inspections.splice(idx, 1); save();
+    if (view.id === x.id) view = { name: "home" };
+    render();
+    toast("Bike deleted", () => { S.inspections.splice(Math.min(idx, S.inspections.length), 0, x); save(); render(); toast("Bike restored"); });
+  });
+}
 function confirmSheet(title, body, okLabel, onOk) {
   const d = document.createElement("div"); d.className = "confirm";
   d.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><h3>${esc(title)}</h3><div class="hint" style="font-size:14px">${esc(body)}</div><button class="btn btn-danger btn-block" data-ok>${esc(okLabel)}</button><button class="btn btn-ghost btn-block" data-cancel>Cancel</button></div>`;
@@ -962,7 +982,9 @@ app.addEventListener("click", (e) => {
   else if (act === "status") { x.status = el.dataset.s; save(); render(); toast("Marked " + x.status); }
   else if (act === "share") shareReport(x);
   else if (act === "intro-done") { S.introDone = true; save(); render(); }
-  else if (act === "delete") confirmSheet("Delete inspection?", `${bikeName(x)} and its checklist will be removed from this device.`, "Delete", () => { S.inspections = S.inspections.filter((i) => i.id !== x.id); save(); go("home"); toast("Deleted"); });
+  else if (act === "delete") deleteBike(x);
+  else if (act === "del-bike") deleteBike(get(el.dataset.id));
+  else if (act === "clear-samples") { const n = S.inspections.filter((i) => i.sample).length; confirmSheet("Remove sample bikes?", `This removes the ${n} example bikes. Bikes you added stay.`, "Remove samples", () => { const before = S.inspections; S.inspections = S.inspections.filter((i) => !i.sample); save(); render(); toast("Samples removed", () => { S.inspections = before; save(); render(); }); }); }
   else if (act === "reset") confirmSheet("Reset to sample data?", "This replaces everything saved on this device with the four example bikes.", "Reset", () => { S = seed(); save(); filter = "All"; render(); toast("Sample data restored"); });
   else if (act === "trust") { const k = el.dataset.k; const order = ["", "trusted", "caution", "flaky"]; const m = (S.sellers[k] ||= {}); m.trust = order[(order.indexOf(m.trust || "") + 1) % order.length]; save(); keepScroll(render); }
   else if (act === "copy") { const v = el.dataset.v; navigator.clipboard?.writeText(v).then(() => toast("Copied " + v), () => toast("Select the number to copy it")); }
