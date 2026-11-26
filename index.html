@@ -554,7 +554,7 @@ function renderHome() {
     <div class="section-h">Saved inspections <small>${xs.length} bikes · swipe a card to delete</small></div>
     <div class="chips" role="group" aria-label="Filter by status">${["All", ...STATUSES].map((st) => `<button class="chip" data-act="filter" data-f="${st}" aria-pressed="${filter === st}">${st}</button>`).join("")}</div>
     <div class="list" style="margin-top:10px">${shown.length ? shown.map(cardHTML).join("") : `<div class="empty">No bikes marked ${esc(filter)} yet.</div>`}</div>
-    <div class="footer-note">Bikes marked Sample are example data. Your inspections save on this device.<br>${S.inspections.some((i) => i.sample) ? `<button data-act="clear-samples">Remove sample bikes</button> · ` : ""}<button data-act="reset">Reset to sample data</button></div>
+    <div class="footer-note">Bikes marked Sample are example data. Your inspections save on this device.<br><button data-act="go" data-to="backup">Back up or restore your data</button><br>${S.inspections.some((i) => i.sample) ? `<button data-act="clear-samples">Remove sample bikes</button> · ` : ""}<button data-act="reset">Reset to sample data</button></div>
   </div>`;
 }
 
@@ -725,10 +725,87 @@ function renderHelp() {
     </div>
 
     <h2>Your data</h2>
-    <div class="panel"><p>Everything you enter stays on your phone. Nothing is uploaded and there's no account to make. If you clear your browser's data or delete the app, your inspections go with it.</p></div>
+    <div class="panel"><p>Everything you enter stays on your phone. Nothing is uploaded and there's no account to make. If you clear your browser's data or delete the app, your inspections go with it, so <b style="color:var(--fg)">make a backup</b> now and then.</p>
+      <button class="btn btn-ghost btn-block" style="margin-top:10px" data-act="go" data-to="backup">Back up or restore</button></div>
 
     <button class="btn btn-primary btn-block" data-act="new">Start an inspection</button>
   </div>`;
+}
+function renderBackup() {
+  const n = S.inspections.length, photos = S.inspections.reduce((k, i) => k + (i.photos || []).length, 0);
+  const sellers = new Set(S.inspections.map((i) => sellerKey(i.sellerName)).filter(Boolean)).size;
+  const last = S.lastBackup ? new Date(S.lastBackup).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : null;
+  const stale = !S.lastBackup || Date.now() - S.lastBackup > 14 * 864e5;
+  return header("Backup & restore", "home") + `<div class="wrap help">
+    <p class="lede">Your bikes live only on this phone. Save a backup file before you switch phones or reset this one, then restore it on the new phone.</p>
+    <div class="panel" style="display:grid;gap:10px">
+      <div class="section-h" style="margin:0">Back up</div>
+      <p>${n} bike${n === 1 ? "" : "s"}, ${sellers} seller${sellers === 1 ? "" : "s"}${photos ? ` and ${photos} photo${photos === 1 ? "" : "s"}` : ""} on this phone.</p>
+      <p style="color:${stale ? "var(--warn)" : "var(--good)"};font-weight:600">${last ? `Last backup: ${last}` : "No backup made yet."}</p>
+      <button class="btn btn-primary btn-block" data-act="backup">Save backup file</button>
+      <p>Save it somewhere that isn't just this phone: Files to iCloud Drive or Google Drive, or email it to yourself.</p>
+    </div>
+    <div class="panel" style="display:grid;gap:10px">
+      <div class="section-h" style="margin:0">Restore</div>
+      <p>Pick a SEND IT! backup file. You can add its bikes to the ones here or replace everything.</p>
+      <label class="btn btn-ghost btn-block" for="restore-in" style="cursor:pointer">Choose backup file</label>
+      <input type="file" id="restore-in" accept=".json,application/json" hidden>
+    </div>
+    <div class="panel"><p><b style="color:var(--fg)">Moving to a new phone:</b> 1) Save a backup here and put it in iCloud Drive, Google Drive or email. 2) On the new phone, open the app link and install it. 3) Come to this screen and choose the backup file.</p></div>
+  </div>`;
+}
+function backupBlob() {
+  const data = JSON.parse(JSON.stringify(S));
+  const payload = { app: "send-it-inspector", version: 1, exportedAt: new Date().toISOString(), data };
+  return new Blob([JSON.stringify(payload)], { type: "application/json" });
+}
+async function saveBackup() {
+  const d = new Date(); const p = (n) => String(n).padStart(2, "0");
+  const name = `send-it-backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`;
+  const blob = backupBlob();
+  const file = new File([blob], name, { type: "application/json" });
+  const done = () => { S.lastBackup = Date.now(); save(); render(); toast("Backup saved"); };
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: "SEND IT! backup" }); done(); return; }
+    catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  try {
+    const url = URL.createObjectURL(blob); const a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000); done();
+  } catch (e) { toast("Couldn't save the file here. Open the app from its own link and try again."); }
+}
+function restoreFrom(file) {
+  const r = new FileReader();
+  r.onerror = () => toast("Couldn't read that file.");
+  r.onload = () => {
+    let p; try { p = JSON.parse(r.result); } catch (e) { p = null; }
+    const data = p && p.app === "send-it-inspector" ? p.data : null;
+    if (!data || !Array.isArray(data.inspections)) { toast("That isn't a SEND IT! backup file."); return; }
+    const when = p.exportedAt ? new Date(p.exportedAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "an earlier date";
+    const have = new Set(S.inspections.map((i) => i.id));
+    const fresh = data.inspections.filter((i) => !have.has(i.id));
+    const d = document.createElement("div"); d.className = "confirm";
+    d.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><h3>Restore backup?</h3>
+      <div class="hint" style="font-size:14px">Backup from ${esc(when)} with ${data.inspections.length} bike${data.inspections.length === 1 ? "" : "s"}. This phone has ${S.inspections.length}.</div>
+      <button class="btn btn-primary btn-block" data-merge ${fresh.length ? "" : "disabled style=\"opacity:.5\""}>Add ${fresh.length} missing bike${fresh.length === 1 ? "" : "s"}</button>
+      <button class="btn btn-danger btn-block" data-replace>Replace everything on this phone</button>
+      <button class="btn btn-ghost btn-block" data-cancel>Cancel</button></div>`;
+    d.addEventListener("click", (e) => {
+      const before = JSON.stringify(S);
+      const undo = () => { S = JSON.parse(before); save(); render(); toast("Restore undone"); };
+      if (e.target.closest("[data-merge]") && fresh.length) {
+        S.inspections.push(...fresh);
+        for (const [k, v] of Object.entries(data.sellers || {})) if (!S.sellers[k]) S.sellers[k] = v;
+        save(); d.remove(); go("home"); toast(`Added ${fresh.length} bike${fresh.length === 1 ? "" : "s"}`, undo);
+      } else if (e.target.closest("[data-replace]")) {
+        S = { routeOff: [], routeOrder: [], sellers: {}, ...data, introDone: true, lastBackup: S.lastBackup };
+        save(); d.remove(); go("home"); toast("Backup restored", undo);
+      } else if (e.target.closest("[data-cancel]") || e.target === d) d.remove();
+    });
+    document.body.appendChild(d); d.querySelector("[data-cancel]").focus();
+  };
+  r.readAsText(file);
 }
 function renderSellers() {
   const groups = {};
@@ -790,6 +867,7 @@ function render() {
   else if (view.name === "sellers") html = renderSellers();
   else if (view.name === "route") html = renderRoute();
   else if (view.name === "help") html = renderHelp();
+  else if (view.name === "backup") html = renderBackup();
   else if (!x) { view = { name: "home" }; return render(); }
   else if (view.name === "details") html = renderDetails(x);
   else if (view.name === "checklist") html = renderChecklist(x);
@@ -990,6 +1068,7 @@ app.addEventListener("click", (e) => {
   else if (act === "edit") { x._fromReport = true; go("details"); }
   else if (act === "status") { x.status = el.dataset.s; save(); render(); toast("Marked " + x.status); }
   else if (act === "share") shareReport(x);
+  else if (act === "backup") saveBackup();
   else if (act === "intro-done") { S.introDone = true; save(); render(); }
   else if (act === "delete") deleteBike(x);
   else if (act === "del-bike") deleteBike(get(el.dataset.id));
@@ -1001,6 +1080,7 @@ app.addEventListener("click", (e) => {
   else if (act === "route-toggle") { const id = el.dataset.id; S.routeOff = el.checked ? S.routeOff.filter((i) => i !== id) : [...S.routeOff, id]; save(); keepScroll(render); }
 });
 app.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.matches('[role="button"]')) { e.preventDefault(); e.target.click(); } });
+app.addEventListener("change", (e) => { if (e.target.id === "restore-in" && e.target.files[0]) { restoreFrom(e.target.files[0]); e.target.value = ""; } });
 app.addEventListener("input", (e) => {
   const t = e.target;
   if (t.dataset.note) { const x = get(view.id); x.checkNotes[t.dataset.note] = t.value; save(); }
