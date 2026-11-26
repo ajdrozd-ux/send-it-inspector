@@ -75,6 +75,14 @@ a { color: var(--orange); }
 .chip[aria-pressed="true"] { background: var(--orange); color: var(--on-accent); border-color: var(--orange); }
 
 .list { display: grid; gap: 10px; }
+.swipe { position: relative; border-radius: 14px; overflow: hidden; }
+.swipe-bg { position: absolute; inset: 0; background: var(--bad); color: #fff; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; font-family: var(--display); font-weight: 800; font-size: 18px; letter-spacing: .06em; text-transform: uppercase; opacity: 0; }
+.swipe-bg span { display: inline-flex; align-items: center; gap: 8px; }
+.swipe-bg svg { width: 22px; height: 22px; }
+.swipe .card { position: relative; touch-action: pan-y; will-change: transform; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.swipe.dragging .swipe-bg { opacity: 1; }
+.swipe.armed .swipe-bg span { transform: scale(1.12); }
+.swipe-hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start; cursor: pointer; text-align: left; width: 100%; }
 .card:hover { border-color: #5a5242; }
 .card .body { min-width: 0; }
@@ -491,9 +499,10 @@ const ICON = {
 };
 const header = (title, back, right = "") => `<header class="top"><div class="top-in wrap">${back ? `<button class="icon-btn" data-act="go" data-to="${back}" aria-label="Back">${ICON.back}</button>` : ""}<h1>${esc(title)}</h1>${right}</div></header>`;
 
+const TRASH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>`;
 function cardHTML(x) {
   const s = x.status;
-  return `<div class="card" role="button" tabindex="0" data-act="open" data-id="${x.id}">
+  return `<div class="swipe" data-id="${x.id}"><div class="swipe-bg" aria-hidden="true"><span>${TRASH}Delete</span><span>Delete${TRASH}</span></div><div class="card" role="button" tabindex="0" data-act="open" data-id="${x.id}">
     ${mono(x.make)}
     <div class="body">
       <div class="title">${esc(bikeName(x))}</div>
@@ -510,7 +519,7 @@ function cardHTML(x) {
       </div>
     </div>
     ${scoreBadge(x)}
-  </div>`;
+  </div></div>`;
 }
 
 function renderHome() {
@@ -542,7 +551,7 @@ function renderHome() {
       ${upcoming.sellerAddress ? `<a class="link-sm" href="${esc(mapsDir(upcoming.sellerAddress))}" target="_blank" rel="noopener" data-stop>Directions to ${esc(upcoming.sellerAddress)}</a>` : ""}
       <div style="margin-top:8px">${contactBtns(upcoming.sellerPhone, upcoming.sellerName, [upcoming])}</div></div>
     </div>` : ""}
-    <div class="section-h">Saved inspections <small>${xs.length} bikes</small></div>
+    <div class="section-h">Saved inspections <small>${xs.length} bikes · swipe a card to delete</small></div>
     <div class="chips" role="group" aria-label="Filter by status">${["All", ...STATUSES].map((st) => `<button class="chip" data-act="filter" data-f="${st}" aria-pressed="${filter === st}">${st}</button>`).join("")}</div>
     <div class="list" style="margin-top:10px">${shown.length ? shown.map(cardHTML).join("") : `<div class="empty">No bikes marked ${esc(filter)} yet.</div>`}</div>
     <div class="footer-note">Bikes marked Sample are example data. Your inspections save on this device.<br>${S.inspections.some((i) => i.sample) ? `<button data-act="clear-samples">Remove sample bikes</button> · ` : ""}<button data-act="reset">Reset to sample data</button></div>
@@ -934,7 +943,7 @@ function toast(msg, undo) {
   if (undo) { const b = document.createElement("button"); b.textContent = "Undo"; b.onclick = () => { t.remove(); undo(); }; t.appendChild(b); }
   document.body.appendChild(t); setTimeout(() => t.remove(), undo ? 6000 : 1800);
 }
-function deleteBike(x) {
+function deleteBike(x, onCancel) {
   const s = scoreOf(x);
   confirmSheet(`Delete ${bikeName(x)}?`, `This removes the bike${s.answered ? `, its ${s.answered} checklist answers` : ""}${x.photos.length ? ` and ${x.photos.length} photo${x.photos.length > 1 ? "s" : ""}` : ""} from this phone.`, "Delete bike", () => {
     const idx = S.inspections.findIndex((i) => i.id === x.id); if (idx < 0) return;
@@ -942,12 +951,12 @@ function deleteBike(x) {
     if (view.id === x.id) view = { name: "home" };
     render();
     toast("Bike deleted", () => { S.inspections.splice(Math.min(idx, S.inspections.length), 0, x); save(); render(); toast("Bike restored"); });
-  });
+  }, onCancel);
 }
-function confirmSheet(title, body, okLabel, onOk) {
+function confirmSheet(title, body, okLabel, onOk, onCancel) {
   const d = document.createElement("div"); d.className = "confirm";
   d.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><h3>${esc(title)}</h3><div class="hint" style="font-size:14px">${esc(body)}</div><button class="btn btn-danger btn-block" data-ok>${esc(okLabel)}</button><button class="btn btn-ghost btn-block" data-cancel>Cancel</button></div>`;
-  d.addEventListener("click", (e) => { if (e.target.closest("[data-ok]")) { d.remove(); onOk(); } else if (e.target.closest("[data-cancel]") || e.target === d) d.remove(); });
+  d.addEventListener("click", (e) => { if (e.target.closest("[data-ok]")) { d.remove(); onOk(); } else if (e.target.closest("[data-cancel]") || e.target === d) { d.remove(); onCancel && onCancel(); } });
   document.body.appendChild(d); d.querySelector("[data-cancel]").focus();
 }
 
@@ -997,6 +1006,44 @@ app.addEventListener("input", (e) => {
   if (t.dataset.note) { const x = get(view.id); x.checkNotes[t.dataset.note] = t.value; save(); }
   if (t.dataset.snote) { (S.sellers[t.dataset.snote] ||= {}).notes = t.value; save(); }
 });
+/* ---------- Swipe a Garage card left or right to delete ---------- */
+let sw = null, swipeJustEnded = false;
+app.addEventListener("pointerdown", (e) => {
+  const card = e.target.closest(".swipe > .card");
+  if (!card || e.button > 0 || e.target.closest("a, button")) return;
+  sw = { card, wrap: card.parentElement, x0: e.clientX, y0: e.clientY, dx: 0, active: false, id: e.pointerId };
+});
+app.addEventListener("pointermove", (e) => {
+  if (!sw || e.pointerId !== sw.id) return;
+  const dx = e.clientX - sw.x0, dy = e.clientY - sw.y0;
+  if (!sw.active) {
+    if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }
+    if (Math.abs(dx) < 12) return;
+    sw.active = true; sw.wrap.classList.add("dragging"); sw.card.style.transition = "none";
+    try { sw.card.setPointerCapture(e.pointerId); } catch (err) {}
+  }
+  e.preventDefault();
+  sw.dx = dx;
+  sw.card.style.transform = `translateX(${dx}px)`;
+  sw.wrap.classList.toggle("armed", Math.abs(dx) > sw.wrap.offsetWidth * 0.33);
+});
+function endSwipe(e) {
+  if (!sw || (e && e.pointerId !== sw.id)) return;
+  const s = sw; sw = null;
+  if (!s.active) return;
+  swipeJustEnded = true; setTimeout(() => (swipeJustEnded = false), 50);
+  const w = s.wrap.offsetWidth;
+  const snapBack = () => { s.card.style.transition = "transform .2s ease"; s.card.style.transform = ""; setTimeout(() => s.wrap.classList.remove("dragging", "armed"), 200); };
+  if (Math.abs(s.dx) > w * 0.33) {
+    s.card.style.transition = "transform .18s ease-out";
+    s.card.style.transform = `translateX(${s.dx > 0 ? w : -w}px)`;
+    const x = get(s.wrap.dataset.id);
+    if (x) setTimeout(() => deleteBike(x, snapBack), 150); else snapBack();
+  } else snapBack();
+}
+app.addEventListener("pointerup", endSwipe);
+app.addEventListener("pointercancel", endSwipe);
+app.addEventListener("click", (e) => { if (swipeJustEnded) { e.stopPropagation(); e.preventDefault(); } }, true);
 function keepScroll(fn) { const y = window.scrollY; fn(); window.scrollTo(0, y); }
 render();
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
