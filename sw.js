@@ -1,5 +1,5 @@
 // Offline support: cache the app shell, serve it from cache, refresh in the background.
-const CACHE = "sendit-v3";
+const CACHE = "sendit-v4";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "img/logo.jpg", "img/start-button.webp",
   "icons/icon-32.png", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
