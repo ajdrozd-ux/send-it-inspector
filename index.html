@@ -461,6 +461,7 @@ function contactBtns(phone, name, bikes, small) {
   return `<span class="cbtns"><a class="${cls}" href="tel:${esc(n)}" data-stop aria-label="Call ${esc(name || "seller")}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2"/></svg>Call</a><a class="${cls}" href="sms:${esc(n)}?&body=${encodeURIComponent(smsBody(name, bikes))}" data-stop aria-label="Text ${esc(name || "seller")}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Text</a></span>`;
 }
 const mapsDir = (a) => "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(a);
+const usage = (x, sep = " · ") => [x.hours ? Number(String(x.hours).replace(/[^\d.]/g, "") || 0).toLocaleString("en-US") + " hrs" : "", x.miles ? Number(String(x.miles).replace(/[^\d.]/g, "") || 0).toLocaleString("en-US") + " mi" : ""].filter(Boolean).join(sep);
 const bikeName = (x) => [x.year, x.make !== "Other" ? x.make : "", x.model].filter(Boolean).join(" ") || "Untitled bike";
 const sellerKey = (n) => (n || "").trim().toLowerCase();
 function fmtWhen(s) {
@@ -551,9 +552,11 @@ function fairValue(x) {
   let v = msrp * kept;
   factors.push([`Base value for a ${age ? age + "-year-old" : "current"} ${cc ? cc + "cc " : ""}${TYPES[type].label.toLowerCase().replace(" bike", "")} bike`, round50(v)]);
   // Hours or miles against what's normal for its age.
-  const h = num(x.hours);
+  // Dual-sports go by the odometer when there is one; everything else by the hour meter.
+  const hrs = num(x.hours), mi = num(x.miles);
+  const miles = mi > 0 && (type === "dual" || !(hrs > 0));
+  const h = miles ? mi : hrs;
   if (h !== null && h > 0) {
-    const miles = type === "dual" || h > 1000;
     const expected = Math.max(1, age) * (miles ? 2000 : HRS_PER_YEAR[type]);
     const f = clamp(((expected - h) / expected) * 0.15, -0.15, 0.1);
     if (Math.abs(f) >= 0.01) { factors.push([`${f > 0 ? "Low" : "High"} ${miles ? "miles" : "hours"} (${h.toLocaleString("en-US")} vs about ${expected.toLocaleString("en-US")} typical)`, round50(v * f)]); v *= 1 + f; }
@@ -617,10 +620,10 @@ function seed() {
   const ktm = { ...all(baseIds.slice(0, 20), "good"), e6: "issue", e3: "issue", f4: "issue" };
   return {
     inspections: [
-      { id: uid(), sample: true, make: "Yamaha", model: "YZ250F", year: "2019", type: "mx", vin: "JYACG31C9KA012345", hours: "62", sellerName: "Jake R.", sellerPhone: "(208) 555-0147", sellerAddress: "Eagle, ID", listingUrl: "facebook.com/marketplace", asking: 5200, lowest: 4700, notes: "Fork seals weeping. Chain and sprockets due. He'll throw in the stock pipe.", appt: localDT(-3, 17, 30), status: "Inspected", checks: yz, checkNotes: { s1: "Left fork seal weeping", xm3: "No record of last top end" }, photos: [], created: Date.now() - 4e8 },
-      { id: uid(), sample: true, make: "Honda", model: "CRF450RL", year: "2021", type: "dual", vin: "", hours: "", sellerName: "Maria T.", sellerPhone: "(208) 555-0192", sellerAddress: "Meridian, ID", listingUrl: "craigslist.org", asking: 8400, lowest: "", notes: "Says 1,900 miles, plated in Idaho. Bring a battery tester.", appt: localDT(2, 10, 0), status: "Scheduled", checks: {}, checkNotes: {}, photos: [], created: Date.now() - 2e8 },
-      { id: uid(), sample: true, make: "KTM", model: "300 XC-W", year: "2017", type: "enduro", vin: "VBKXCW43XHM123456", hours: "140", sellerName: "Dusty's Powersports", sellerPhone: "(208) 555-0110", sellerAddress: "Nampa, ID", listingUrl: "", asking: 4900, lowest: 4500, notes: "Sweet smell from the exhaust and oil film in the coolant. Passed.", appt: localDT(-6, 13, 0), status: "Passed", checks: ktm, checkNotes: { e6: "Oil film in radiator", e3: "White sweet-smelling smoke" }, photos: [], created: Date.now() - 6e8 },
-      { id: uid(), sample: true, make: "Kawasaki", model: "KLX140R", year: "2020", type: "trail", vin: "", hours: "", sellerName: "Jake R.", sellerPhone: "(208) 555-0147", sellerAddress: "Eagle, ID", listingUrl: "", asking: 2300, lowest: "", notes: "His kid's bike. Could bundle with the YZ.", appt: localDT(4, 16, 0), status: "Watching", checks: {}, checkNotes: {}, photos: [], created: Date.now() - 1e8 }
+      { id: uid(), sample: true, make: "Yamaha", model: "YZ250F", year: "2019", type: "mx", vin: "JYACG31C9KA012345", hours: "62", miles: "", sellerName: "Jake R.", sellerPhone: "(208) 555-0147", sellerAddress: "Eagle, ID", listingUrl: "facebook.com/marketplace", asking: 5200, lowest: 4700, notes: "Fork seals weeping. Chain and sprockets due. He'll throw in the stock pipe.", appt: localDT(-3, 17, 30), status: "Inspected", checks: yz, checkNotes: { s1: "Left fork seal weeping", xm3: "No record of last top end" }, photos: [], created: Date.now() - 4e8 },
+      { id: uid(), sample: true, make: "Honda", model: "CRF450RL", year: "2021", type: "dual", vin: "", hours: "", miles: "1900", sellerName: "Maria T.", sellerPhone: "(208) 555-0192", sellerAddress: "Meridian, ID", listingUrl: "craigslist.org", asking: 8400, lowest: "", notes: "Plated in Idaho. Bring a battery tester.", appt: localDT(2, 10, 0), status: "Scheduled", checks: {}, checkNotes: {}, photos: [], created: Date.now() - 2e8 },
+      { id: uid(), sample: true, make: "KTM", model: "300 XC-W", year: "2017", type: "enduro", vin: "VBKXCW43XHM123456", hours: "140", miles: "", sellerName: "Dusty's Powersports", sellerPhone: "(208) 555-0110", sellerAddress: "Nampa, ID", listingUrl: "", asking: 4900, lowest: 4500, notes: "Sweet smell from the exhaust and oil film in the coolant. Passed.", appt: localDT(-6, 13, 0), status: "Passed", checks: ktm, checkNotes: { e6: "Oil film in radiator", e3: "White sweet-smelling smoke" }, photos: [], created: Date.now() - 6e8 },
+      { id: uid(), sample: true, make: "Kawasaki", model: "KLX140R", year: "2020", type: "trail", vin: "", hours: "", miles: "", sellerName: "Jake R.", sellerPhone: "(208) 555-0147", sellerAddress: "Eagle, ID", listingUrl: "", asking: 2300, lowest: "", notes: "His kid's bike. Could bundle with the YZ.", appt: localDT(4, 16, 0), status: "Watching", checks: {}, checkNotes: {}, photos: [], created: Date.now() - 1e8 }
     ],
     sellers: { "jake r.": { trust: "trusted", notes: "Quick to reply, met on time." }, "dusty's powersports": { trust: "caution", notes: "Didn't mention the coolant issue until asked." } },
     routeOff: [], routeOrder: []
@@ -630,6 +633,14 @@ let S;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
 if (!S || !Array.isArray(S.inspections)) S = seed();
 S.routeOff ||= []; S.routeOrder ||= []; S.sellers ||= {};
+// Older saves kept hours and miles in one "hours" field. Dual-sport bikes and numbers over 1,000 were miles.
+function splitOdo(x) {
+  if (x.miles !== undefined) return x;
+  const n = parseFloat(String(x.hours ?? "").replace(/[^\d.]/g, ""));
+  if (isFinite(n) && n > 0 && (x.type === "dual" || n > 1000)) { x.miles = x.hours; x.hours = ""; } else x.miles = "";
+  return x;
+}
+S.inspections.forEach(splitOdo);
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
 /* ---------- Photos: compressed JPEGs in IndexedDB, metadata in S ----------
@@ -802,7 +813,10 @@ function renderDetails(x) {
       <div class="field"><label for="model">Model</label><input id="model" name="model" placeholder="e.g. YZ250F, CRF250L, 300 XC-W" value="${esc(x.model)}"></div>
       <div class="detect" id="detect">${detectHTML(x, auto)}</div>
       <div class="row">
-        <div class="field"><label for="hours">Hours / miles</label><input id="hours" name="hours" inputmode="numeric" value="${esc(x.hours)}"></div>
+        <div class="field"><label for="hours">Engine hours</label><input id="hours" name="hours" inputmode="numeric" placeholder="Hour meter" value="${esc(x.hours)}"></div>
+        <div class="field"><label for="miles">Miles</label><input id="miles" name="miles" inputmode="numeric" placeholder="Odometer" value="${esc(x.miles)}"></div>
+      </div>
+      <div class="row">
         <div class="field"><label for="status">Status</label><select id="status" name="status">${STATUSES.map((s) => `<option ${x.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></div>
       </div>
       <div class="field"><label for="vin">VIN</label><input id="vin" name="vin" class="mono-font" maxlength="17" placeholder="17 characters, on the steering head" value="${esc(x.vin)}" style="text-transform:uppercase"></div>
@@ -901,7 +915,7 @@ function renderReport(x) {
       <div><div class="big">${s.v === "none" ? s.label : s.label + (s.v === "send" ? "!" : "")}</div><p>${words[s.v]}</p></div>
       <div class="pct">${s.pct ?? "–"}${s.pct !== null ? "<small>% good</small>" : ""}</div>
     </div>
-    <div class="panel" style="display:flex;gap:12px;align-items:center">${mono(x.make)}<div style="min-width:0"><div style="font-weight:700;font-size:17px">${esc(bikeName(x))}</div><div class="hint">${x.type ? TYPES[x.type].label + " · " : ""}${x.hours ? esc(x.hours) + " hrs/mi · " : ""}<span class="tag s-${x.status}">${x.status}</span></div></div></div>
+    <div class="panel" style="display:flex;gap:12px;align-items:center">${mono(x.make)}<div style="min-width:0"><div style="font-weight:700;font-size:17px">${esc(bikeName(x))}</div><div class="hint">${x.type ? TYPES[x.type].label + " · " : ""}${usage(x) ? esc(usage(x)) + " · " : ""}<span class="tag s-${x.status}">${x.status}</span></div></div></div>
     <div class="price-row">
       <div><b>${money(x.asking)}</b><span>Asking</span></div>
       <div><b style="color:var(--good)">${money(x.lowest)}</b><span>Lowest</span></div>
@@ -1052,6 +1066,7 @@ function restoreFrom(file) {
     let p; try { p = JSON.parse(r.result); } catch (e) { p = null; }
     const data = p && p.app === "send-it-inspector" ? p.data : null;
     if (!data || !Array.isArray(data.inspections)) { toast("That isn't a SEND IT! backup file."); return; }
+    data.inspections.forEach(splitOdo);
     const when = p.exportedAt ? new Date(p.exportedAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : "an earlier date";
     const have = new Set(S.inspections.map((i) => i.id));
     const fresh = data.inspections.filter((i) => !have.has(i.id));
@@ -1170,7 +1185,7 @@ function bindDetails(x) {
       const v = decodeVin(t.value); document.getElementById("vinout").innerHTML = vinHTML(v);
       if (v && v.ok && v.year && !document.getElementById("year").value) document.getElementById("year").value = v.year;
     }
-    if (["make", "model", "year", "hours", "asking", "bookValue", "vin"].includes(t.name)) {
+    if (["make", "model", "year", "hours", "miles", "asking", "bookValue", "vin"].includes(t.name)) {
       const tmp = { ...x }; for (const el of f.elements) if (el.name) tmp[el.name] = el.value;
       if (!x._typePicked) tmp.type = classify(tmp.make, tmp.model);
       document.getElementById("fmv").innerHTML = fmvSummary(tmp);
@@ -1264,7 +1279,7 @@ async function reportImage(x) {
   const title = bikeName(x).toUpperCase(); let ts = 64; while (g.measureText(title).width > W - P * 2 - 180 && ts > 36) { ts -= 2; g.font = `800 ${ts}px ${D}`; }
   g.fillText(title, P + 180, P + 108);
   g.fillStyle = "#a69d8b"; g.font = `500 30px ${B}`;
-  g.fillText([x.type ? TYPES[x.type].label : "", x.hours ? x.hours + " hrs/mi" : "", x.vin ? "VIN …" + x.vin.slice(-6) : ""].filter(Boolean).join("  ·  "), P + 180, P + 150);
+  g.fillText([x.type ? TYPES[x.type].label : "", usage(x, "  ·  "), x.vin ? "VIN …" + x.vin.slice(-6) : ""].filter(Boolean).join("  ·  "), P + 180, P + 150);
   // verdict
   let y = P + 200; const [vb, vf] = COL[s.v];
   g.fillStyle = vb; g.beginPath(); g.roundRect(P, y, W - P * 2, 230, 28); g.fill();
@@ -1369,7 +1384,7 @@ app.addEventListener("click", (e) => {
   const el = e.target.closest("[data-act]"); if (!el) return;
   const act = el.dataset.act;
   const x = view.id ? get(view.id) : null;
-  if (act === "new") { draftNew = { id: uid(), make: "", model: "", year: "", type: null, vin: "", hours: "", sellerName: "", sellerPhone: "", sellerAddress: "", listingUrl: "", asking: "", lowest: "", notes: "", appt: "", status: "Watching", checks: {}, checkNotes: {}, photos: [], created: Date.now() }; go("details", draftNew.id); }
+  if (act === "new") { draftNew = { id: uid(), make: "", model: "", year: "", type: null, vin: "", hours: "", miles: "", sellerName: "", sellerPhone: "", sellerAddress: "", listingUrl: "", asking: "", lowest: "", notes: "", appt: "", status: "Watching", checks: {}, checkNotes: {}, photos: [], created: Date.now() }; go("details", draftNew.id); }
   else if (act === "open") { const t = get(el.dataset.id); go(scoreOf(t).answered || t.status === "Inspected" || t.status === "Passed" || t.status === "Bought" ? "report" : "details", t.id); }
   else if (act === "filter") { filter = el.dataset.f; render(); }
   else if (act === "go") {
