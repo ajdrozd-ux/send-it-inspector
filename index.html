@@ -138,7 +138,28 @@ legend { font-family: var(--display); font-weight: 700; letter-spacing: .1em; te
 .photos .ph { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); max-width: 100%; }
 .photos img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .photos .ph button { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: rgba(0,0,0,.7); color: #fff; font-size: 13px; line-height: 1; }
-.add-photo { aspect-ratio: 1; border: 1px dashed var(--line); border-radius: 8px; display: grid; place-items: center; color: var(--muted); font-size: 12px; text-align: center; cursor: pointer; }
+.add-photo { aspect-ratio: 1; border: 1px dashed var(--line); border-radius: 8px; display: grid; place-items: center; align-content: center; gap: 2px; color: var(--muted); font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; line-height: 1.2; }
+.add-photo.cam { border-color: #6b4317; color: var(--orange); }
+.add-photo svg { width: 22px; height: 22px; }
+.photos button.ph { padding: 0; cursor: pointer; }
+.photos .ph .pt { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 4px 3px; font-size: 10px; font-weight: 700; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.8)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.photos .ph.red { border-color: #6b2a20; }
+.ph-hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.check-cam { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+.check-cam svg { width: 15px; height: 15px; }
+.check-cam.has { color: var(--orange); border-color: #6b4317; }
+.check .photos { grid-template-columns: repeat(5, 1fr); }
+.flag-list .photos { grid-template-columns: repeat(5, 1fr); margin-top: 8px; }
+.ph-count { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.ph-count svg { width: 14px; height: 14px; }
+.pv { position: fixed; inset: 0; z-index: 45; background: rgba(0,0,0,.94); display: grid; grid-template-rows: auto 1fr auto; gap: 10px; padding: calc(12px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); touch-action: pan-y; }
+.pv-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; max-width: 640px; width: 100%; margin: 0 auto; }
+.pv-h b { font-family: var(--display); font-size: 18px; text-transform: uppercase; letter-spacing: .04em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-img { min-height: 0; display: grid; place-items: center; position: relative; }
+.pv-img img { max-height: 100%; max-width: 100%; object-fit: contain; border-radius: 8px; -webkit-touch-callout: default; }
+.pv-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 22px; }
+.pv-nav.prev { left: 0; } .pv-nav.next { right: 0; }
+.pv-f { display: grid; gap: 8px; max-width: 448px; width: 100%; margin: 0 auto; text-align: center; }
 
 .btn { border: 0; border-radius: 12px; padding: 13px 16px; font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .btn-primary { background: var(--orange); color: var(--on-accent); font-family: var(--display); font-size: 19px; letter-spacing: .06em; text-transform: uppercase; }
@@ -281,6 +302,8 @@ legend { font-family: var(--display); font-weight: 700; letter-spacing: .1em; te
 
 
 <div id="app"></div>
+<input type="file" id="cam-in" accept="image/*" capture="environment" hidden>
+<input type="file" id="lib-in" accept="image/*" multiple hidden>
 <nav class="tabs" aria-label="Main">
   <div class="tabs-in">
     <button data-tab="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="16" r="3.5"/><circle cx="18.5" cy="16" r="3.5"/><path d="M5.5 16 9 9h5l2 4h2.5M9 9 8 6h3M14 9l4.5 7"/></svg>Garage</button>
@@ -609,6 +632,90 @@ if (!S || !Array.isArray(S.inspections)) S = seed();
 S.routeOff ||= []; S.routeOrder ||= []; S.sellers ||= {};
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
+/* ---------- Photos: compressed JPEGs in IndexedDB, metadata in S ----------
+   x.photos = [{ id, check?, at }]. The image blobs (full + thumbnail) live in the
+   "sendit-photos" database so they don't eat the small localStorage quota. */
+const PDB = (() => {
+  let dbp;
+  const open = () => dbp ||= new Promise((res, rej) => {
+    const r = indexedDB.open("sendit-photos", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("photos", { keyPath: "id" });
+    r.onsuccess = () => res(r.result); r.onerror = () => { dbp = null; rej(r.error); };
+  });
+  const run = async (mode, fn) => {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction("photos", mode); let out;
+      const r = fn(t.objectStore("photos")); if (r) r.onsuccess = () => { out = r.result; };
+      t.oncomplete = () => res(out); t.onerror = t.onabort = () => rej(t.error || new Error("Photo storage failed"));
+    });
+  };
+  return {
+    put: (rec) => run("readwrite", (s) => s.put(rec)),
+    get: (id) => run("readonly", (s) => s.get(id)),
+    del: (ids) => run("readwrite", (s) => { for (const id of [].concat(ids)) s.delete(id); }),
+    keys: () => run("readonly", (s) => s.getAllKeys())
+  };
+})();
+const thumbURL = new Map();
+const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+// Older versions kept photos as data URLs in x.photos. Wrap them now; migratePhotos() moves them into IndexedDB.
+for (const x of S.inspections) {
+  x.photos = (x.photos || []).map((p) => typeof p === "string" ? { id: uid(), at: x.created || Date.now(), _data: p } : p);
+  x.checkNotes ||= {}; x.checks ||= {};
+}
+const toBlob = (canvas, q) => new Promise((res, rej) => canvas.toBlob((b) => b ? res(b) : rej(new Error("encode")), "image/jpeg", q));
+function loadImage(blob) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(blob); const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); res(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("That file isn't a photo this phone can read.")); };
+    img.src = url;
+  });
+}
+function scaled(img, max, q) {
+  const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  return toBlob(c, q);
+}
+// A 12 MP phone photo (3-6 MB) becomes a ~200-350 KB, 1600 px JPEG plus a ~20 KB thumbnail.
+async function compress(blob) {
+  const img = await loadImage(blob);
+  const [full, thumb] = await Promise.all([scaled(img, 1600, 0.72), scaled(img, 360, 0.7)]);
+  return { full, thumb };
+}
+async function storePhoto(blob, id = uid()) {
+  const { full, thumb } = await compress(blob);
+  await PDB.put({ id, full, thumb, created: Date.now() });
+  thumbURL.set(id, URL.createObjectURL(thumb));
+  return id;
+}
+const dataToBlob = (d) => fetch(d).then((r) => r.blob());
+const blobToData = (b) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(b); });
+async function migratePhotos() {
+  let moved = 0;
+  for (const x of S.inspections) for (const p of x.photos) {
+    if (!p._data) continue;
+    try { await storePhoto(await dataToBlob(p._data), p.id); delete p._data; moved++; } catch (e) {}
+  }
+  if (moved) { save(); render(); }
+}
+// Remove stored photos that no bike points to any more (deleted bikes, removed photos, abandoned drafts).
+async function cleanPhotos() {
+  const used = new Set(S.inspections.flatMap((x) => x.photos.map((p) => p.id)));
+  if (draftNew) draftNew.photos.forEach((p) => used.add(p.id));
+  const orphans = (await PDB.keys()).filter((k) => !used.has(k));
+  if (orphans.length) await PDB.del(orphans);
+}
+async function hydratePhotos(root = document) {
+  for (const img of root.querySelectorAll("img[data-pid]")) {
+    const id = img.dataset.pid;
+    if (thumbURL.has(id)) { img.src = thumbURL.get(id); continue; }
+    try { const rec = await PDB.get(id); if (rec) { thumbURL.set(id, URL.createObjectURL(rec.thumb)); img.src = thumbURL.get(id); } } catch (e) {}
+  }
+}
+
 let view = { name: "home" }, filter = "All", openCats = {};
 const app = document.getElementById("app");
 const get = (id) => S.inspections.find((x) => x.id === id) || (draftNew && draftNew.id === id ? draftNew : undefined);
@@ -633,6 +740,7 @@ function cardHTML(x) {
         <span class="tag s-${s}">${s}</span>
         ${x.type ? `<span class="tag type">${TYPES[x.type].short}</span>` : ""}
         ${x.sample ? `<span class="tag sample">Sample</span>` : ""}
+        ${x.photos.length ? `<span class="ph-count" aria-label="${x.photos.length} photos">${CAM}${x.photos.length}</span>` : ""}
         ${x.appt && (s === "Scheduled" || s === "Watching") ? `<span style="color:var(--orange);font-weight:600">${fmtWhen(x.appt)}</span>` : ""}
         ${x.listingUrl ? `<a class="link-sm" href="${esc(normUrl(x.listingUrl))}" target="_blank" rel="noopener" data-stop>View listing</a>` : ""}
         ${x.sellerAddress ? `<a class="link-sm" href="${esc(mapsDir(x.sellerAddress))}" target="_blank" rel="noopener" data-stop>Directions</a>` : ""}
@@ -719,8 +827,8 @@ function renderDetails(x) {
       <div class="field"><label for="notes">Negotiation notes</label><textarea id="notes" name="notes">${esc(x.notes)}</textarea></div>
     </fieldset>
     <fieldset><legend>Photos</legend>
-      <div class="photos" id="photos">${photosHTML(x)}</div>
-      <input type="file" id="photo-in" accept="image/*" multiple hidden>
+      ${photoGrid(x)}
+      <div class="ph-hint">Take photos of the bike, the VIN plate and the title. You can also add photos to any checklist item.</div>
     </fieldset>
     <div class="actions">
       <button type="submit" class="btn btn-primary btn-block">Start checklist</button>
@@ -737,7 +845,20 @@ function detectHTML(x, auto) {
     ${t ? `<div class="hint" style="flex-basis:100%">Adds ${SPECIAL[t].checks.length} ${TYPES[t].label.toLowerCase()} checks to the inspection.</div>` : ""}`;
 }
 const vinHTML = (v) => !v ? `<div class="hint">Decodes the maker and model year offline.</div>` : `<div class="vin-out ${v.ok ? "ok" : "bad"}">${esc(v.msg)}</div>`;
-const photosHTML = (x) => x.photos.map((p, i) => `<div class="ph"><img src="${p}" alt="Bike photo ${i + 1}"><button type="button" data-act="rm-photo" data-i="${i}" aria-label="Remove photo">×</button></div>`).join("") + `<label class="add-photo" for="photo-in">+ Add<br>photo</label>`;
+const CAM = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>`;
+function checkName(x, id) { for (const c of categoriesFor(x)) for (const k of c.checks) if (k[0] === id) return k[1]; return ""; }
+const photosOf = (x, check) => check ? x.photos.filter((p) => p.check === check) : x.photos;
+// A grid of photo thumbnails. With no check it shows every photo of the bike, labeled with the checklist item it belongs to.
+function photoGrid(x, { check = null, add = true } = {}) {
+  const tiles = photosOf(x, check).map((p, i) => {
+    const cn = !check && p.check ? checkName(x, p.check) : "";
+    return `<button type="button" class="ph${p.check && x.checks[p.check] === "issue" ? " red" : ""}" data-act="view-photo" data-pid="${p.id}" data-scope="${esc(check || "")}" aria-label="Open photo ${i + 1}${cn ? ": " + esc(cn) : ""}"><img data-pid="${p.id}" src="${p._data || thumbURL.get(p.id) || BLANK}" alt="">${cn ? `<span class="pt">${esc(cn)}</span>` : ""}</button>`;
+  }).join("");
+  const adds = !add ? "" : `<label class="add-photo cam" for="cam-in" role="button" data-act="ph-target" data-check="${esc(check || "")}">${CAM}Take<br>photo</label>` +
+    (check ? "" : `<label class="add-photo" for="lib-in" role="button" data-act="ph-target" data-check="">+<br>From<br>library</label>`);
+  return `<div class="photos">${tiles}${adds}</div>`;
+}
+const camPill = (x, id) => { const n = photosOf(x, id).length; return `<label class="check-cam${n ? " has" : ""}" for="cam-in" role="button" data-act="ph-target" data-check="${id}" aria-label="Take a photo of this item${n ? ` (${n} so far)` : ""}">${CAM}${n || "Photo"}</label>`; };
 
 function renderChecklist(x) {
   const s = scoreOf(x);
@@ -753,7 +874,7 @@ function renderChecklist(x) {
         ${open ? c.checks.map(([id, q, how, crit]) => {
           const g = x.checks[id];
           return `<div class="check ${g === "issue" ? "is-issue" : ""}">
-            <div class="q">${esc(q)} ${crit ? `<span class="crit">Dealbreaker</span>` : ""}</div>
+            <div class="q">${esc(q)} ${crit ? `<span class="crit">Dealbreaker</span>` : ""}${camPill(x, id)}</div>
             <div class="how">${esc(how)}</div>
             <div class="grade" role="group" aria-label="${esc(q)}">
               <button class="g" data-act="grade" data-k="${id}" data-g="good" aria-pressed="${g === "good"}">Good</button>
@@ -761,6 +882,7 @@ function renderChecklist(x) {
               <button class="s" data-act="grade" data-k="${id}" data-g="skip" aria-pressed="${g === "skip"}">Skip</button>
             </div>
             ${g === "issue" ? `<textarea data-note="${id}" id="note-${id}" placeholder="What's wrong? Estimated repair cost?">${esc(x.checkNotes[id] || "")}</textarea>` : ""}
+            ${photosOf(x, id).length ? photoGrid(x, { check: id, add: false }) : ""}
           </div>`;
         }).join("") : ""}
       </section>`;
@@ -787,8 +909,8 @@ function renderReport(x) {
     </div>
     ${fmvPanel(x)}
     ${s.red.length || s.issues.length ? `<div class="panel"><div class="section-h" style="margin-top:0">Problems found</div><ul class="flag-list">
-      ${s.red.map((c) => `<li class="red"><b>⚠ ${esc(c.q)}</b><span>${esc(x.checkNotes[c.id] || c.cat)}</span></li>`).join("")}
-      ${s.issues.map((c) => `<li><b>${esc(c.q)}</b><span>${esc(x.checkNotes[c.id] || c.cat)}</span></li>`).join("")}
+      ${s.red.map((c) => `<li class="red"><b>⚠ ${esc(c.q)}</b><span>${esc(x.checkNotes[c.id] || c.cat)}</span>${photosOf(x, c.id).length ? photoGrid(x, { check: c.id, add: false }) : ""}</li>`).join("")}
+      ${s.issues.map((c) => `<li><b>${esc(c.q)}</b><span>${esc(x.checkNotes[c.id] || c.cat)}</span>${photosOf(x, c.id).length ? photoGrid(x, { check: c.id, add: false }) : ""}</li>`).join("")}
     </ul></div>` : ""}
     <div class="panel"><div class="section-h" style="margin-top:0">Checklist <small>${s.good} good · ${s.issue} issues · ${s.skip} skipped</small></div>
       <button class="btn btn-ghost btn-block" data-act="go" data-to="checklist">${s.answered ? "Continue checklist" : "Start checklist"} (${s.answered}/${s.total})</button></div>
@@ -804,7 +926,8 @@ function renderReport(x) {
       ${x.sellerPhone ? `<div style="margin-top:10px">${contactBtns(x.sellerPhone, x.sellerName, [x])}</div>` : ""}
       ${x.notes ? `<p style="margin:10px 0 0;font-size:14px;color:var(--muted)">${esc(x.notes)}</p>` : ""}
     </div>
-    ${x.photos.length ? `<div class="panel"><div class="section-h" style="margin-top:0">Photos</div><div class="photos">${x.photos.map((p) => `<div class="ph"><img src="${p}" alt=""></div>`).join("")}</div></div>` : ""}
+    <div class="panel"><div class="section-h" style="margin-top:0">Photos <small>${x.photos.length ? `${x.photos.length} saved` : "none yet"}</small></div>${photoGrid(x)}
+      <div class="ph-hint">${x.photos.length ? "Tap a photo to see it full size. Photos you take on checklist items show up here too." : "Take photos during the inspection. They're saved with this bike on your phone."}</div></div>
     <div class="panel"><div class="section-h" style="margin-top:0">Mark as</div><div class="chips" style="flex-wrap:wrap">${STATUSES.map((st) => `<button class="chip" data-act="status" data-s="${st}" aria-pressed="${x.status === st}">${st}</button>`).join("")}</div></div>
     <button class="btn btn-primary btn-block" data-act="share">Share report</button>
     <button class="btn btn-danger btn-block" data-act="delete">Delete this inspection</button>
@@ -819,7 +942,7 @@ function renderHelp() {
     <ol class="steps">
       <li><b>Add the bike</b><p>Tap <em>Start New Inspection</em> and enter the make and model. The app works out whether it's a motocross, trail, dual-sport or enduro bike and adds the right checks. Paste the listing link, the seller's name and number, the asking price and when you're meeting.</p></li>
       <li><b>Check the VIN</b><p>At the bike, type the VIN from the steering head. The app shows the maker and model year so you can catch a bike that isn't what the ad says.</p></li>
-      <li><b>Go through the checklist</b><p>Mark each item <em>Good</em>, <em>Issue</em> or <em>Skip</em>. Each one tells you what to look for. Items marked <span class="crit">Dealbreaker</span> are the ones that can cost more than the bike is worth. When you mark an issue, jot down what's wrong and what it might cost to fix.</p></li>
+      <li><b>Go through the checklist</b><p>Mark each item <em>Good</em>, <em>Issue</em> or <em>Skip</em>. Each one tells you what to look for. Items marked <span class="crit">Dealbreaker</span> are the ones that can cost more than the bike is worth. When you mark an issue, jot down what's wrong and what it might cost to fix. Tap <em>Photo</em> on any item to snap it with your camera. Every photo is saved with the bike and shows on its report.</p></li>
       <li><b>Get the verdict</b><p>Tap <em>See the verdict</em>. You'll see the score, every problem found, and a straight answer.</p></li>
       <li><b>Negotiate and share</b><p>Use the problem list to back up your offer and record the lowest price the seller will take. Tap <em>Share report</em> to text the results to a buddy or show the seller.</p></li>
       <li><b>Keep track</b><p>Mark each bike Watching, Scheduled, Inspected, Bought or Passed. The <em>Sellers</em> tab keeps everyone you've dealt with, with a Trusted, Caution or Flaky rating. The <em>Route</em> tab lines up several viewings in one trip and opens it in Google Maps.</p></li>
@@ -853,7 +976,7 @@ function renderHelp() {
     </div>
 
     <h2>Your data</h2>
-    <div class="panel"><p>Everything you enter stays on your phone. Nothing is uploaded and there's no account to make. If you clear your browser's data or delete the app, your inspections go with it, so <b style="color:var(--fg)">make a backup</b> now and then.</p>
+    <div class="panel"><p>Everything you enter stays on your phone. Nothing is uploaded and there's no account to make. Photos are shrunk to about a quarter of a megabyte each so they don't fill up your phone. If you clear your browser's data or delete the app, your inspections and photos go with it, so <b style="color:var(--fg)">make a backup</b> now and then.</p>
       <button class="btn btn-ghost btn-block" style="margin-top:10px" data-act="go" data-to="backup">Back up or restore</button></div>
 
     <button class="btn btn-primary btn-block" data-act="new">Start an inspection</button>
@@ -882,15 +1005,34 @@ function renderBackup() {
     <div class="panel"><p><b style="color:var(--fg)">Moving to a new phone:</b> 1) Save a backup here and put it in iCloud Drive, Google Drive or email. 2) On the new phone, open the app link and install it. 3) Come to this screen and choose the backup file.</p></div>
   </div>`;
 }
-function backupBlob() {
+// Photos go in the backup file as JPEG data URLs keyed by photo id.
+async function backupBlob() {
   const data = JSON.parse(JSON.stringify(S));
-  const payload = { app: "send-it-inspector", version: 1, exportedAt: new Date().toISOString(), data };
+  const photos = {};
+  for (const x of S.inspections) for (const p of x.photos) {
+    if (p._data) { photos[p.id] = p._data; continue; }
+    try { const rec = await PDB.get(p.id); if (rec) photos[p.id] = await blobToData(rec.full); } catch (e) {}
+  }
+  for (const x of data.inspections) for (const p of x.photos) delete p._data;
+  const payload = { app: "send-it-inspector", version: 2, exportedAt: new Date().toISOString(), data, photos };
   return new Blob([JSON.stringify(payload)], { type: "application/json" });
+}
+// Store the photos a restored backup carries. Version 1 backups kept them inside each bike, which migratePhotos() handles.
+async function importPhotos(bikes, photos) {
+  let n = 0;
+  for (const x of bikes) {
+    x.photos = (x.photos || []).map((p) => typeof p === "string" ? { id: uid(), at: x.created || Date.now(), _data: p } : p);
+    for (const p of x.photos) if (!p._data && photos && photos[p.id]) p._data = photos[p.id];
+    n += x.photos.length;
+  }
+  if (n) toast(`Restoring ${n} photo${n > 1 ? "s" : ""}…`);
+  await migratePhotos();
 }
 async function saveBackup() {
   const d = new Date(); const p = (n) => String(n).padStart(2, "0");
   const name = `send-it-backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.json`;
-  const blob = backupBlob();
+  if (S.inspections.some((x) => x.photos.length)) toast("Packing photos into the backup…");
+  const blob = await backupBlob();
   const file = new File([blob], name, { type: "application/json" });
   const done = () => { S.lastBackup = Date.now(); save(); render(); toast("Backup saved"); };
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -925,10 +1067,10 @@ function restoreFrom(file) {
       if (e.target.closest("[data-merge]") && fresh.length) {
         S.inspections.push(...fresh);
         for (const [k, v] of Object.entries(data.sellers || {})) if (!S.sellers[k]) S.sellers[k] = v;
-        save(); d.remove(); go("home"); toast(`Added ${fresh.length} bike${fresh.length === 1 ? "" : "s"}`, undo);
+        d.remove(); importPhotos(fresh, p.photos).then(() => { save(); go("home"); toast(`Added ${fresh.length} bike${fresh.length === 1 ? "" : "s"}`, undo); });
       } else if (e.target.closest("[data-replace]")) {
         S = { routeOff: [], routeOrder: [], sellers: {}, ...data, introDone: true, lastBackup: S.lastBackup };
-        save(); d.remove(); go("home"); toast("Backup restored", undo);
+        d.remove(); importPhotos(S.inspections, p.photos).then(() => { save(); go("home"); toast("Backup restored", undo); });
       } else if (e.target.closest("[data-cancel]") || e.target === d) d.remove();
     });
     document.body.appendChild(d); d.querySelector("[data-cancel]").focus();
@@ -1004,6 +1146,7 @@ function render() {
   const tab = ["sellers", "route"].includes(view.name) ? view.name : "home";
   document.querySelectorAll(".tabs button").forEach((b) => { if (b.dataset.tab === tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   if (view.name === "details") bindDetails(x);
+  hydratePhotos(app);
 }
 function go(name, id) { view = { name, id: id ?? view.id }; render(); window.scrollTo(0, 0); }
 
@@ -1035,18 +1178,64 @@ function bindDetails(x) {
   });
   f.addEventListener("change", () => readForm(x));
   f.addEventListener("submit", (e) => { e.preventDefault(); readForm(x); commitDraft(x); go("checklist", x.id); });
-  document.getElementById("photo-in").addEventListener("change", async (e) => {
-    for (const file of e.target.files) { try { x.photos.push(await compress(file)); } catch (err) {} }
-    e.target.value = ""; save(); document.getElementById("photos").innerHTML = photosHTML(x);
-  });
 }
 function commitDraft(x) { if (draftNew && draftNew.id === x.id) { S.inspections.push(x); draftNew = null; } delete x._typePicked; delete x._fromReport; save(); }
-function compress(file) {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => { const img = new Image(); img.onload = () => { const k = Math.min(1, 900 / Math.max(img.width, img.height)); const c = document.createElement("canvas"); c.width = img.width * k; c.height = img.height * k; c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); res(c.toDataURL("image/jpeg", 0.7)); }; img.onerror = rej; img.src = r.result; };
-    r.onerror = rej; r.readAsDataURL(file);
+
+/* ---------- Taking and viewing photos ---------- */
+let photoTarget = null, persistAsked = false;
+async function addPhotos(files) {
+  const t = photoTarget; const x = t && get(t.id);
+  if (!x || !files.length) return;
+  if (view.name === "details") readForm(x);
+  toast(files.length > 1 ? `Saving ${files.length} photos…` : "Saving photo…");
+  let ok = 0, err = null;
+  for (const f of files) {
+    try { const id = await storePhoto(f); x.photos.push(t.check ? { id, check: t.check, at: Date.now() } : { id, at: Date.now() }); ok++; }
+    catch (e) { err = e; }
+  }
+  if (ok) {
+    save(); if (view.id === x.id) keepScroll(render);
+    toast(`${ok} photo${ok > 1 ? "s" : ""} saved${t.check ? " to " + (checkName(x, t.check) || "this item") : ""}${err ? `, ${files.length - ok} failed` : ""}`);
+    if (!persistAsked && navigator.storage && navigator.storage.persist) { persistAsked = true; navigator.storage.persist().catch(() => {}); }
+  } else if (err) toast(err.name === "QuotaExceededError" ? "Phone storage is full. Delete some photos or bikes and try again." : (err.message && err.message.startsWith("That file") ? err.message : "Couldn't save that photo. Try again."));
+}
+for (const id of ["cam-in", "lib-in"]) document.getElementById(id).addEventListener("change", (e) => { const files = [...e.target.files]; e.target.value = ""; addPhotos(files); });
+
+function openViewer(x, pid, scope) {
+  const list = () => photosOf(x, scope || null);
+  let i = list().findIndex((p) => p.id === pid), full = null;
+  const d = document.createElement("div"); d.className = "pv"; d.setAttribute("role", "dialog"); d.setAttribute("aria-modal", "true");
+  const close = () => { d.remove(); if (full) URL.revokeObjectURL(full); document.removeEventListener("keydown", key); };
+  const show = async () => {
+    const L = list(); if (!L.length) return close();
+    i = (i + L.length) % L.length; const p = L[i];
+    const cn = p.check ? checkName(x, p.check) : "";
+    const note = p.check && x.checks[p.check] === "issue" ? x.checkNotes[p.check] : "";
+    const when = new Date(p.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    d.innerHTML = `<div class="pv-h"><b>${esc(cn || bikeName(x))}</b><button class="btn btn-ghost" data-close>Close</button></div>
+      <div class="pv-img"><img alt="${esc(cn || bikeName(x))} photo ${i + 1}" src="${p._data || thumbURL.get(p.id) || BLANK}">${L.length > 1 ? `<button class="pv-nav prev" data-d="-1" aria-label="Previous photo">‹</button><button class="pv-nav next" data-d="1" aria-label="Next photo">›</button>` : ""}</div>
+      <div class="pv-f"><div class="hint">${i + 1} of ${L.length} · ${esc(when)}${note ? " · " + esc(note) : ""}</div><button class="btn btn-danger btn-block" data-del>Delete photo</button></div>`;
+    if (p._data) return;
+    const rec = await PDB.get(p.id).catch(() => null);
+    if (rec && list()[i] === p && d.isConnected) { if (full) URL.revokeObjectURL(full); full = URL.createObjectURL(rec.full); d.querySelector(".pv-img img").src = full; }
+  };
+  const step = (n) => { i += n; show(); };
+  const key = (e) => { if (e.key === "Escape") close(); else if (e.key === "ArrowLeft") step(-1); else if (e.key === "ArrowRight") step(1); };
+  d.addEventListener("click", (e) => {
+    if (e.target.closest("[data-close]")) close();
+    else if (e.target.closest("[data-d]")) step(Number(e.target.closest("[data-d]").dataset.d));
+    else if (e.target.closest("[data-del]")) {
+      const p = list()[i]; const at = x.photos.indexOf(p);
+      x.photos.splice(at, 1); save(); keepScroll(render); show();
+      // The image itself is cleared from storage on the next launch, so Undo can bring it back.
+      toast("Photo deleted", () => { x.photos.splice(Math.min(at, x.photos.length), 0, p); save(); keepScroll(render); });
+    }
   });
+  let tx = null;
+  d.addEventListener("touchstart", (e) => { tx = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+  d.addEventListener("touchend", (e) => { if (tx === null) return; const dx = e.changedTouches[0].clientX - tx; tx = null; if (Math.abs(dx) > 50 && list().length > 1) step(dx < 0 ? 1 : -1); });
+  document.addEventListener("keydown", key);
+  document.body.appendChild(d); show(); d.querySelector("[data-close]").focus();
 }
 /* ---------- Shareable report image ---------- */
 const imgCache = {};
@@ -1184,13 +1373,14 @@ app.addEventListener("click", (e) => {
   else if (act === "open") { const t = get(el.dataset.id); go(scoreOf(t).answered || t.status === "Inspected" || t.status === "Passed" || t.status === "Bought" ? "report" : "details", t.id); }
   else if (act === "filter") { filter = el.dataset.f; render(); }
   else if (act === "go") {
-    if (view.name === "details" && x) { readForm(x); if (el.dataset.to === "home") { if (draftNew && draftNew.id === x.id && !(x.make || x.model || x.sellerName)) draftNew = null; else commitDraft(x); } }
+    if (view.name === "details" && x) { readForm(x); if (el.dataset.to === "home") { if (draftNew && draftNew.id === x.id && !(x.make || x.model || x.sellerName || x.photos.length)) draftNew = null; else commitDraft(x); } }
     if (el.dataset.to === "help" && !S.introDone) { S.introDone = true; save(); }
     go(el.dataset.to);
   }
   else if (act === "save-home") { readForm(x); commitDraft(x); toast("Saved"); go("home"); }
   else if (act === "type") { x.type = el.dataset.t; x._typePicked = true; document.getElementById("detect").innerHTML = detectHTML(x, classify(x.make, x.model)); save(); }
-  else if (act === "rm-photo") { x.photos.splice(Number(el.dataset.i), 1); save(); document.getElementById("photos").innerHTML = photosHTML(x); }
+  else if (act === "ph-target") photoTarget = { id: x.id, check: el.dataset.check || null };
+  else if (act === "view-photo") { if (view.name === "details") readForm(x); openViewer(x, el.dataset.pid, el.dataset.scope); }
   else if (act === "cat") { const c = el.dataset.c; openCats[c] = el.getAttribute("aria-expanded") !== "true"; keepScroll(render); }
   else if (act === "grade") {
     const k = el.dataset.k; x.checks[k] = x.checks[k] === el.dataset.g ? undefined : el.dataset.g;
@@ -1260,6 +1450,7 @@ app.addEventListener("pointercancel", endSwipe);
 app.addEventListener("click", (e) => { if (swipeJustEnded) { e.stopPropagation(); e.preventDefault(); } }, true);
 function keepScroll(fn) { const y = window.scrollY; fn(); window.scrollTo(0, y); }
 render();
+migratePhotos().then(cleanPhotos).catch(() => {});
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 </script>
 

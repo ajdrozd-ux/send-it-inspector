@@ -7,7 +7,7 @@
 ## How it works
 1. **Add the bike.** Tap *Start New Inspection* and enter the make and model. The app detects the bike type and adds the right checks. Add the listing link, seller, asking price and appointment.
 2. **Check the VIN.** Type the VIN from the steering head to confirm the maker and model year.
-3. **Go through the checklist.** Mark each item Good, Issue or Skip. Dealbreaker items are flagged.
+3. **Go through the checklist.** Mark each item Good, Issue or Skip. Dealbreaker items are flagged. Tap *Photo* on any item to take a picture with your camera.
 4. **Get the verdict.** See the score, every problem found and a clear call.
 5. **Know what it's worth.** Each bike shows an estimated market value from its year, engine size, brand, hours and inspection results, and tells you if the asking price is high. Repair costs typed into issue notes ("$180 fork seals") come off the value. Tap *eBay sold* or *Marketplace* for real prices, or enter a J.D. Power number as *Book value*.
 6. **Negotiate and share.** Use the problem list to back up your offer, and tap *Share report* to send the results.
@@ -29,7 +29,7 @@ At least half the list has to be checked before a verdict appears. Skipped items
 Once installed it opens full screen and works with no signal.
 
 ## Your data
-Everything stays on your phone. There's no account and nothing is uploaded. Clearing your browser data or deleting the app removes your inspections.
+Everything stays on your phone. There's no account and nothing is uploaded. Photos are compressed (about 250 KB each) and kept in the browser's IndexedDB storage; backup files include them. Clearing your browser data or deleting the app removes your inspections.
 
 ---
 
