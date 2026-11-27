@@ -9,7 +9,7 @@
 2. **Check the VIN.** Type the VIN from the steering head to confirm the maker and model year.
 3. **Go through the checklist.** Mark each item Good, Issue or Skip. Dealbreaker items are flagged. Tap *Photo* on any item to take a picture with your camera.
 4. **Get the verdict.** See the score, every problem found and a clear call.
-5. **Know what it's worth.** Each bike shows an estimated market value from its year, engine size, brand, hours or miles and inspection results, and tells you if the asking price is high. Repair costs typed into issue notes ("$180 fork seals") come off the value. Tap *eBay sold* or *Marketplace* for real prices, or enter a J.D. Power number as *Book value*.
+5. **Check the price.** Tap *eBay sold* or *Marketplace* on the report to see real prices, or enter a J.D. Power number as *Book value* and the app tells you if the asking price is high.
 6. **Negotiate and share.** Use the problem list to back up your offer, and tap *Share report* to send the results.
 7. **Keep track.** Follow each bike from Watching to Bought or Passed, rate sellers, and plan a multi-stop route in Google Maps.
 

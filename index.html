@@ -205,17 +205,9 @@ legend { font-family: var(--display); font-weight: 700; letter-spacing: .1em; te
 .price-row div { background: var(--bg); border-radius: 10px; padding: 10px 4px; border: 1px solid var(--line); }
 .price-row b { display: block; font-family: var(--display); font-size: 22px; font-variant-numeric: tabular-nums; }
 .fmv { display: grid; gap: 10px; }
-.fmv-big b { display: block; font-family: var(--display); font-size: 40px; line-height: 1; color: var(--orange); font-variant-numeric: tabular-nums; }
-.fmv-big span { font-size: 13px; color: var(--muted); }
 .fmv-line { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
 .fmv-line span { color: var(--muted); }
 .fmv-line b { font-variant-numeric: tabular-nums; }
-.fmv-box { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 6px; }
-.fmv-f { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
-.fmv-f li { display: flex; justify-content: space-between; gap: 10px; }
-.fmv-f span { color: var(--muted); }
-.fmv-f b { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.fmv-sm { color: var(--muted); }
 .deal { font-size: 14px; font-weight: 600; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); }
 .deal.d-good { color: var(--good); border-color: #2f5f31; }
 .deal.d-ok { color: var(--fg); }
@@ -505,84 +497,16 @@ function scoreBadge(x) {
   return `<div class="score v-${s.v}"><b>${s.red.length ? "!" : s.pct}</b><span>${s.label}</span></div>`;
 }
 
-/* ---------- Fair market value (offline estimate) ---------- */
-// Rough 2026 new-bike prices by type and engine size, in US dollars. Values between points are interpolated.
-const MSRP = {
-  mx: [[50, 4300], [65, 5300], [85, 6300], [125, 7900], [250, 9000], [350, 10200], [450, 10600]],
-  enduro: [[125, 8600], [250, 9600], [300, 10200], [350, 10800], [450, 11200], [500, 11800]],
-  trail: [[50, 1900], [110, 2600], [125, 3500], [140, 4200], [230, 5000], [250, 5800], [300, 6500], [450, 9800]],
-  dual: [[230, 5300], [300, 6200], [400, 7300], [450, 10700], [500, 12300], [650, 7400], [700, 12500]]
-};
-const BRAND = { Honda: 1, Yamaha: 1, Kawasaki: 0.98, Suzuki: 0.95, KTM: 1.1, Husqvarna: 1.12, GasGas: 1.03, Beta: 1.08, Other: 0.85 };
-const HRS_PER_YEAR = { mx: 40, enduro: 45, trail: 30, dual: 40 };
-const KEEP_PER_YEAR = { mx: 0.93, enduro: 0.93, trail: 0.95, dual: 0.95 }; // trail and dual-sport bikes hold value better
+/* ---------- Market value: book value check and real-price links ---------- */
 const round50 = (n) => Math.round(n / 50) * 50;
-const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 const num = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.]/g, "")); return isFinite(n) ? n : null; };
-function newPrice(type, cc) {
-  const pts = MSRP[type] || MSRP.mx;
-  if (!cc) return pts[Math.floor(pts.length / 2)][1];
-  if (cc <= pts[0][0]) return pts[0][1];
-  for (let i = 1; i < pts.length; i++) {
-    const [c0, p0] = pts[i - 1], [c1, p1] = pts[i];
-    if (cc <= c1) return p0 + (p1 - p0) * (cc - c0) / (c1 - c0);
-  }
-  return pts[pts.length - 1][1];
-}
-// Repair costs the user typed in issue notes, like "$180 for seals".
-function notedRepairs(x) {
-  let sum = 0;
-  for (const [id, g] of Object.entries(x.checks || {})) {
-    if (g !== "issue") continue;
-    for (const m of String((x.checkNotes || {})[id] || "").matchAll(/\$\s?(\d[\d,]*)/g)) sum += Number(m[1].replace(/,/g, ""));
-  }
-  return sum;
-}
-function fairValue(x) {
-  const year = parseInt(x.year, 10), thisYear = new Date().getFullYear();
-  if (!x.make || !x.model || !year || year < 1970 || year > thisYear + 1) return null;
-  const type = x.type || classify(x.make, x.model) || "mx";
-  const ccM = String(x.model).match(/(\d{2,4})/); const cc = ccM ? Number(ccM[1]) : null;
-  const age = Math.max(0, thisYear - year);
-  const factors = [];
-  // What it cost new in its model year (new prices have crept up about 1.5% a year).
-  const msrp = newPrice(type, cc) * (BRAND[x.make] ?? 0.9) / Math.pow(1.015, age);
-  // Typical private-party resale: about 80% of new in year one, then 5 to 7% less each year, never under 20%.
-  const kept = Math.max(0.2, age === 0 ? 0.85 : 0.8 * Math.pow(KEEP_PER_YEAR[type], age - 1));
-  let v = msrp * kept;
-  factors.push([`Base value for a ${age ? age + "-year-old" : "current"} ${cc ? cc + "cc " : ""}${TYPES[type].label.toLowerCase().replace(" bike", "")} bike`, round50(v)]);
-  // Hours or miles against what's normal for its age.
-  // Dual-sports go by the odometer when there is one; everything else by the hour meter.
-  const hrs = num(x.hours), mi = num(x.miles);
-  const miles = mi > 0 && (type === "dual" || !(hrs > 0));
-  const h = miles ? mi : hrs;
-  if (h !== null && h > 0) {
-    const expected = Math.max(1, age) * (miles ? 2000 : HRS_PER_YEAR[type]);
-    const f = clamp(((expected - h) / expected) * 0.15, -0.15, 0.1);
-    if (Math.abs(f) >= 0.01) { factors.push([`${f > 0 ? "Low" : "High"} ${miles ? "miles" : "hours"} (${h.toLocaleString("en-US")} vs about ${expected.toLocaleString("en-US")} typical)`, round50(v * f)]); v *= 1 + f; }
-  }
-  // Condition from the inspection. Repair costs typed into issue notes replace the generic penalty.
-  const s = scoreOf(x), repairs = notedRepairs(x);
-  let cond = "unknown";
-  if (s.v !== "none") {
-    cond = s.red.length ? "dealbreaker" : s.v;
-    const f = { send: 0.04, neg: -0.08, walk: -0.18, dealbreaker: -0.4 }[cond];
-    if (repairs && f < 0) { factors.push(["Repairs you noted", -repairs]); v -= repairs; }
-    else { factors.push([{ send: "Inspection: clean bike", neg: "Inspection: fixable issues", walk: "Inspection: lots of problems", dealbreaker: "Inspection: dealbreaker found" }[cond], round50(v * f)]); v *= 1 + f; }
-  } else if (repairs) { factors.push(["Repairs you noted", -repairs]); v -= repairs; }
-  v = Math.max(v, msrp * 0.1, 300);
-  const mid = round50(v);
-  const sure = cc && x.make !== "Other" && cond !== "unknown";
-  return { mid, low: round50(v * 0.88), high: round50(v * 1.12), factors, cond, confidence: sure ? "Medium" : "Low" };
-}
-function dealCall(x, fv) {
-  const ask = num(x.asking); if (!ask || !fv) return null;
-  const book = num(x.bookValue), base = book || fv.mid, r = ask / base, d = money(round50(Math.abs(ask - base)));
-  const ref = book ? "your book value" : "the estimate";
-  if (r <= 0.9) return { cls: "good", text: `Asking is ${d} under ${ref}. Priced to sell.` };
-  if (r <= 1.08) return { cls: "ok", text: `Asking is about right for ${ref}.` };
-  if (r <= 1.2) return { cls: "warn", text: `Asking is ${d} over ${ref}. Open around ${money(round50(Math.min(fv.low, base * 0.9)))}.` };
-  return { cls: "bad", text: `Asking is ${d} over ${ref}, so it's overpriced. Open around ${money(round50(Math.min(fv.low, base * 0.9)))} or keep looking.` };
+function dealCall(x) {
+  const ask = num(x.asking), book = num(x.bookValue); if (!ask || !book) return null;
+  const r = ask / book, d = money(round50(Math.abs(ask - book))), offer = money(round50(book * 0.9));
+  if (r <= 0.9) return { cls: "good", text: `Asking is ${d} under your book value. Priced to sell.` };
+  if (r <= 1.08) return { cls: "ok", text: `Asking is about right for your book value.` };
+  if (r <= 1.2) return { cls: "warn", text: `Asking is ${d} over your book value. Open around ${offer}.` };
+  return { cls: "bad", text: `Asking is ${d} over your book value, so it's overpriced. Open around ${offer} or keep looking.` };
 }
 const compsLinks = (x) => {
   const q = encodeURIComponent([x.year, x.make !== "Other" ? x.make : "", x.model].filter(Boolean).join(" "));
@@ -590,23 +514,17 @@ const compsLinks = (x) => {
     <a class="cbtn" href="https://www.facebook.com/marketplace/search?query=${q}" target="_blank" rel="noopener">Marketplace</a>
     <a class="cbtn" href="https://www.jdpower.com/motorcycles" target="_blank" rel="noopener">J.D. Power</a>`;
 };
-function fmvSummary(x) {
-  const fv = fairValue(x);
-  if (!fv) return `<div class="hint">Add the make, model and year to see an estimated market value.</div>`;
-  const deal = dealCall(x, fv);
-  return `<div class="fmv-line"><span>Est. value</span><b>${money(fv.low)}–${money(fv.high)}</b></div>${deal ? `<div class="deal d-${deal.cls}">${esc(deal.text)}</div>` : ""}`;
+function bookSummary(x) {
+  const deal = dealCall(x);
+  return deal ? `<div class="deal d-${deal.cls}">${esc(deal.text)}</div>` : "";
 }
-function fmvPanel(x) {
-  const fv = fairValue(x);
-  if (!fv) return `<div class="panel"><div class="section-h" style="margin-top:0">Fair market value</div><div class="hint">Add the make, model and year to see an estimated value.</div></div>`;
-  const deal = dealCall(x, fv);
+function marketPanel(x) {
+  const deal = dealCall(x);
   return `<div class="panel fmv">
-    <div class="section-h" style="margin-top:0">Fair market value <small>SEND IT! estimate</small></div>
-    <div class="fmv-big"><b>${money(fv.mid)}</b><span>${money(fv.low)} to ${money(fv.high)} private sale</span></div>
+    <div class="section-h" style="margin-top:0">Market value</div>
     ${x.bookValue ? `<div class="fmv-line"><span>Your book value</span><b>${money(num(x.bookValue))}</b></div>` : ""}
     ${deal ? `<div class="deal d-${deal.cls}">${esc(deal.text)}</div>` : ""}
-    <ul class="fmv-f">${fv.factors.map(([l, n], i) => `<li><span>${esc(l)}</span><b>${i === 0 ? money(n) : (n >= 0 ? "+" : "−") + money(Math.abs(n))}</b></li>`).join("")}</ul>
-    <p class="hint">Confidence: ${fv.confidence}.${fv.cond === "unknown" ? " Finish the checklist to factor in condition." : ""} This is an estimate from the year, engine size, brand, hours and your inspection, not a price guide. Check real sold prices near you before you make an offer, and put repair costs in your issue notes (like “$180 fork seals”) to take them off the value.</p>
+    <p class="hint">${x.bookValue ? "Compare with real sold prices near you before you make an offer." : "Check what this bike really sells for. Look it up on J.D. Power and add it as Book value to check the asking price."}</p>
     <div class="contact">${compsLinks(x)}</div>
   </div>`;
 }
@@ -746,7 +664,7 @@ function cardHTML(x) {
     ${mono(x.make)}
     <div class="body">
       <div class="title">${esc(bikeName(x))}</div>
-      <div class="sub">${esc(x.sellerName || "No seller yet")}${x.asking ? " · " + money(x.asking) : ""}${x.lowest ? ` <span style="color:var(--good)">→ ${money(x.lowest)}</span>` : ""}${(() => { const fv = fairValue(x); return fv ? ` <span class="fmv-sm">· worth ~${money(fv.mid)}</span>` : ""; })()}</div>
+      <div class="sub">${esc(x.sellerName || "No seller yet")}${x.asking ? " · " + money(x.asking) : ""}${x.lowest ? ` <span style="color:var(--good)">→ ${money(x.lowest)}</span>` : ""}</div>
       <div class="meta">
         <span class="tag s-${s}">${s}</span>
         ${x.type ? `<span class="tag type">${TYPES[x.type].short}</span>` : ""}
@@ -837,7 +755,7 @@ function renderDetails(x) {
         <div class="field"><label for="lowest">Lowest offered</label><input id="lowest" name="lowest" inputmode="numeric" placeholder="$" value="${esc(x.lowest)}"></div>
       </div>
       <div class="field"><label for="bookValue">Book value <span class="opt">optional</span></label><input id="bookValue" name="bookValue" inputmode="numeric" placeholder="From J.D. Power or KBB, if you looked it up" value="${esc(x.bookValue)}"></div>
-      <div class="fmv-box" id="fmv">${fmvSummary(x)}</div>
+      <div id="fmv">${bookSummary(x)}</div>
       <div class="field"><label for="notes">Negotiation notes</label><textarea id="notes" name="notes">${esc(x.notes)}</textarea></div>
     </fieldset>
     <fieldset><legend>Photos</legend>
@@ -921,7 +839,7 @@ function renderReport(x) {
       <div><b style="color:var(--good)">${money(x.lowest)}</b><span>Lowest</span></div>
       <div><b>${saved ? money(saved) : "–"}</b><span>Saved</span></div>
     </div>
-    ${fmvPanel(x)}
+    ${marketPanel(x)}
     ${s.red.length || s.issues.length ? `<div class="panel"><div class="section-h" style="margin-top:0">Problems found</div><ul class="flag-list">
       ${s.red.map((c) => `<li class="red"><b>⚠ ${esc(c.q)}</b><span>${esc(x.checkNotes[c.id] || c.cat)}</span>${photosOf(x, c.id).length ? photoGrid(x, { check: c.id, add: false }) : ""}</li>`).join("")}
       ${s.issues.map((c) => `<li><b>${esc(c.q)}</b><span>${esc(x.checkNotes[c.id] || c.cat)}</span>${photosOf(x, c.id).length ? photoGrid(x, { check: c.id, add: false }) : ""}</li>`).join("")}
@@ -971,7 +889,7 @@ function renderHelp() {
     </div>
 
     <h2>What's it worth?</h2>
-    <div class="panel"><p>Each bike gets an <b style="color:var(--fg)">estimated market value</b> once you enter the make, model and year. It starts from what the bike cost new, takes off the usual yearly drop, then adjusts for hours or miles and for what your inspection found. Type repair costs into your issue notes (like “$180 fork seals”) and they come off the value. It's a SEND IT! estimate, not a price guide, so tap <em>eBay sold</em> or <em>Marketplace</em> on the report to see real prices, or look it up on J.D. Power and type the number into <em>Book value</em>.</p></div>
+    <div class="panel"><p>On the report, tap <em>eBay sold</em> or <em>Marketplace</em> to see what the same bike really sells for, or look it up on <em>J.D. Power</em>. Type that number into <em>Book value</em> on the bike's details and the app tells you whether the asking price is low, fair or high, and where to open.</p></div>
 
     <h2>Tips from the pits</h2>
     <ul class="tips">
@@ -1185,10 +1103,10 @@ function bindDetails(x) {
       const v = decodeVin(t.value); document.getElementById("vinout").innerHTML = vinHTML(v);
       if (v && v.ok && v.year && !document.getElementById("year").value) document.getElementById("year").value = v.year;
     }
-    if (["make", "model", "year", "hours", "miles", "asking", "bookValue", "vin"].includes(t.name)) {
+    if (["asking", "bookValue"].includes(t.name)) {
       const tmp = { ...x }; for (const el of f.elements) if (el.name) tmp[el.name] = el.value;
       if (!x._typePicked) tmp.type = classify(tmp.make, tmp.model);
-      document.getElementById("fmv").innerHTML = fmvSummary(tmp);
+      document.getElementById("fmv").innerHTML = bookSummary(tmp);
     }
   });
   f.addEventListener("change", () => readForm(x));
@@ -1289,8 +1207,8 @@ async function reportImage(x) {
   g.fillText(sub, P + 44, y + 182);
   if (s.pct !== null) { g.textAlign = "right"; g.font = `800 120px ${D}`; g.fillText(s.pct + "%", W - P - 40, y + 130); g.font = `700 26px ${D}`; g.fillText("CHECKS GOOD", W - P - 44, y + 180); g.textAlign = "left"; }
   // prices
-  y += 270; const cw = (W - P * 2 - 40) / 3; const fv = fairValue(x);
-  [["ASKING", money(x.asking), "#f2ede3"], ["LOWEST OFFERED", money(x.lowest), "#57b85a"], fv ? ["EST. VALUE", money(fv.mid), "#f08a1c"] : ["CHECKED", `${s.answered}/${s.total}`, "#f2ede3"]].forEach(([l, v, col], i) => {
+  y += 270; const cw = (W - P * 2 - 40) / 3;
+  [["ASKING", money(x.asking), "#f2ede3"], ["LOWEST OFFERED", money(x.lowest), "#57b85a"], x.bookValue ? ["BOOK VALUE", money(num(x.bookValue)), "#f08a1c"] : ["CHECKED", `${s.answered}/${s.total}`, "#f2ede3"]].forEach(([l, v, col], i) => {
     const cx = P + i * (cw + 20);
     g.fillStyle = "#1b1915"; g.strokeStyle = "#3a3529"; g.lineWidth = 2; g.beginPath(); g.roundRect(cx, y, cw, 140, 20); g.fill(); g.stroke();
     g.fillStyle = col; g.font = `800 58px ${D}`; g.textAlign = "center"; g.fillText(v, cx + cw / 2, y + 74);
@@ -1325,7 +1243,7 @@ function reportText(x) {
   const s = scoreOf(x);
   const lines = [`${bikeName(x)} — ${s.v === "none" ? s.label : s.label.toUpperCase()}${s.pct !== null ? ` (${s.pct}% good)` : ""}`];
   if (x.asking) lines.push(`Asking ${money(x.asking)}${x.lowest ? `, lowest offered ${money(x.lowest)}` : ""}`);
-  const fv = fairValue(x); if (fv) lines.push(`Est. market value ${money(fv.low)}–${money(fv.high)} (SEND IT! estimate)${x.bookValue ? `, book value ${money(num(x.bookValue))}` : ""}`);
+  if (x.bookValue) lines.push(`Book value ${money(num(x.bookValue))}`);
   for (const k of s.red) lines.push(`⚠ ${k.q}${x.checkNotes[k.id] ? ": " + x.checkNotes[k.id] : ""}`);
   for (const k of s.issues) lines.push(`• ${k.q}${x.checkNotes[k.id] ? ": " + x.checkNotes[k.id] : ""}`);
   lines.push(`Checked ${s.answered}/${s.total} items with SEND IT! Inspector`);
